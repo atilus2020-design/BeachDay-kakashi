@@ -1,0 +1,27 @@
+/* Example 1 — Beach Day design tokens (light + dark). Every text/background pair is checked by contrast-check.mjs. */
+:root {
+  color-scheme: light dark;
+  --bg: #eef6fb;           --surface: #ffffff;      --text: #0b2233;        --text-2: #3d5566;
+  --accent: #0a6aa6;       --on-accent: #ffffff;
+  --score-great: #0f7b3f;  --score-good: #2f6f00;   --score-fair: #8a5a00;  --score-poor: #b3261e;
+  --glass-tint: rgba(255,255,255,0.62); --glass-border: rgba(255,255,255,0.7);
+  --radius-s: 12px; --radius-m: 20px; --radius-l: 28px;
+  --space: 4px; --tap: 44px;
+  --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, "Segoe UI", Roboto, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #071823;         --surface: #10283a;      --text: #eaf4fb;        --text-2: #a9c1d2;
+    --accent: #5cb8f0;     --on-accent: #04121c;
+    --score-great: #5fd68f; --score-good: #a6d96a;  --score-fair: #f2c14e;  --score-poor: #ff8a80;
+    --glass-tint: rgba(16,40,58,0.62); --glass-border: rgba(255,255,255,0.14);
+  }
+}
+.glass {
+  background: var(--glass-tint);
+  -webkit-backdrop-filter: blur(20px) saturate(160%); backdrop-filter: blur(20px) saturate(160%);
+  border: 1px solid var(--glass-border); border-radius: var(--radius-m);
+  box-shadow: 0 8px 32px rgba(0,0,0,.12);
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) { .glass { background: var(--surface); } }
+@media (prefers-reduced-transparency: reduce) { .glass { background: var(--surface); backdrop-filter: none; -webkit-backdrop-filter: none; } }

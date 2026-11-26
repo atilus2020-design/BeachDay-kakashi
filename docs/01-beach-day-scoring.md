@@ -84,6 +84,7 @@ Score only the hours people are actually at the beach: daylight hours from **09:
 | Condition (any hour in the window) | Effect | Why |
 |---|---|---|
 | `weather_code` ∈ {95, 96, 99} (thunderstorm, with or without hail) | Day capped at **20, "No-go: lightning"** if ≥ 2 window hours; that hour scores 0 | NWS: "When thunder roars, go indoors", and wait 30 minutes after the last thunder. https://www.weather.gov/safety/lightning-safety-overview |
+| Half or more of the window hours have rain codes (61–67, 80–82) or `precipitation_probability` ≥ 70% | Capped at **35, "Rain most of the day"** | Found when testing on live data (25 Nov 2026, Miami Beach): a day of continuous rain otherwise scored 52 |
 | `wind_gusts_10m` ≥ 39 mph (Beaufort 8, gale) | Capped at 20 | Unsafe, and sand blasts |
 | `wave_height` ≥ 6 ft | Capped at 30, "Dangerous surf" | High surf; likely high rip-current risk |
 | Apparent temperature ≥ 125 °F | Capped at 20 | NWS heat index "Extreme Danger" |

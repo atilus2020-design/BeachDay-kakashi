@@ -103,7 +103,7 @@ form.addEventListener("submit", async (e) => {
       setPwError(causeCode === "same_password" ? "Choose a password you haven't used before." : "That password is too easy to guess. Try a longer one.");
       pw.focus();
     } else if (code === "not_configured") {
-      showFormError("Sign-in isn't configured.", true);
+      showFormError("Sign-in isn't set up on this site yet. Try again later.", true);
     } else if (code === "network" && typeof status === "number" && status >= 500) {
       showFormError("Sign-in service unavailable, try again later.", true);
     } else {
@@ -120,7 +120,7 @@ function start(): void {
   if (!isAuthConfigured() || !supabase) {
     setState("none");
     checking.hidden = true;
-    showFormError("Sign-in isn't configured.", false);
+    showFormError("Sign-in isn't set up on this site yet. Try again later.", false);
     return;
   }
 

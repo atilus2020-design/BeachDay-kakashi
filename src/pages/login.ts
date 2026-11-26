@@ -61,7 +61,7 @@ function setBusy(btn: HTMLButtonElement, busy: boolean, label: string): void {
 function errorText(err: unknown): string {
   const code = err instanceof AuthFlowError ? err.code : "unknown";
   switch (code) {
-    case "not_configured": return "Sign-in isn't configured.";
+    case "not_configured": return "Sign-in isn't set up on this site yet. Try again later.";
     case "invalid_credentials": return "Email or password is incorrect.";
     case "email_not_confirmed": return "Confirm your email first. Check your inbox for the link.";
     case "weak_password": return "That password is too easy to guess. Try a longer one.";
@@ -368,7 +368,7 @@ signoutBtn.addEventListener("click", async () => {
 async function start(): Promise<void> {
   if (!isAuthConfigured() || !supabase) {
     show("none");
-    showFormError("Sign-in isn't configured.", null);
+    showFormError("Sign-in isn't set up on this site yet. Try again later.", null);
     return;
   }
 

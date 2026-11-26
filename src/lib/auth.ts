@@ -4,7 +4,7 @@
 // Uses only VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY (public by design). Never a secret key.
 // Everything here is convenience: the real gate is requireRole() in every Function (D-008).
 // If the VITE vars are missing, importing this module does NOT throw; every function rejects with
-// AuthFlowError code "not_configured" ("Sign-in isn't configured") so the page can show a message.
+// AuthFlowError code "not_configured" ("Sign-in isn't set up on this site yet. Try again later.") so the page can show a message.
 import { createClient, type AuthChangeEvent, type Session, type SupabaseClient } from "@supabase/supabase-js";
 
 export type Role = "user" | "super_admin";
@@ -19,7 +19,7 @@ export type AuthErrorCode =
   | "unknown";
 
 const MESSAGES: Record<AuthErrorCode, string> = {
-  not_configured: "Sign-in isn't configured",
+  not_configured: "Sign-in isn't set up on this site yet. Try again later.",
   invalid_credentials: "Email or password is incorrect",
   email_not_confirmed: "Confirm your email first, then sign in",
   weak_password: "Choose a stronger password",

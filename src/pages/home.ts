@@ -114,7 +114,9 @@ function scoreBits(d: DayScore, testids: { score: string; label: string; icon?: 
 }
 
 function reasonItems(d: DayScore, testid: string): HTMLElement[] {
-  const src = d.reasons.length ? d.reasons : d.highlights;
+  const shown = labelText(d);
+  const reasons = d.reasons.filter((r) => r !== shown); // don't repeat the label as a reason
+  const src = reasons.length ? reasons : d.highlights;
   if (!src.length) return [h("li", { testid, "data-empty": "true" }, "Nothing is holding today back.")];
   return src.map((r) => h("li", { testid }, r));
 }
@@ -175,7 +177,7 @@ function todayCard(v: View): HTMLElement {
 }
 
 function strip(v: View): HTMLElement {
-  const wrap = h("div", { class: "day-strip", role: "group", "aria-label": "Next days", testid: "day-strip" });
+  const wrap = h("div", { class: "day-strip", role: "group", "aria-labelledby": "next-days-title", testid: "day-strip" });
   v.days.forEach((d, i) => {
     const name = `${weekdayLong(d.date)}, score ${d.score}, ${labelText(d)}${d.lowConfidence ? ", lower confidence" : ""}`;
     const cell = h("button", {
@@ -200,7 +202,7 @@ function renderForecast(): void {
   renderUpdated();
   area.replaceChildren(
     todayCard(view),
-    h("section", { class: "section" }, h("h2", { class: "section__title" }, "Next days"), strip(view)),
+    h("section", { class: "section" }, h("h2", { class: "section__title", id: "next-days-title" }, "Next days"), strip(view)),
   );
   renderDetail(false);
   if (!installShown) {

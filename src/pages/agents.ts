@@ -96,10 +96,10 @@ let tabTeam: HTMLButtonElement, tabProposals: HTMLButtonElement, countEl: HTMLEl
 
 function buildShellOfPage(): void {
   countEl = h("span", { class: "pill", testid: "proposals-count", hidden: true });
-  tabTeam = h("button", { type: "button", class: "btn btn--secondary", role: "tab", testid: "tab-team", id: "tab-team", on: { click: () => { location.hash = "#team"; } } }, "Team");
-  tabProposals = h("button", { type: "button", class: "btn btn--secondary", role: "tab", testid: "tab-proposals", id: "tab-proposals", on: { click: () => { location.hash = "#proposals"; } } }, "Proposals ", countEl);
-  teamView = h("div", { role: "tabpanel", "aria-labelledby": "tab-team" });
-  listView = h("div", { role: "tabpanel", "aria-labelledby": "tab-proposals", hidden: true });
+  tabTeam = h("button", { type: "button", class: "btn btn--secondary", role: "tab", testid: "tab-team", id: "tab-team", "aria-controls": "panel-team", on: { click: () => { location.hash = "#team"; } } }, "Team");
+  tabProposals = h("button", { type: "button", class: "btn btn--secondary", role: "tab", testid: "tab-proposals", id: "tab-proposals", "aria-controls": "panel-proposals", on: { click: () => { location.hash = "#proposals"; } } }, "Proposals ", countEl);
+  teamView = h("div", { id: "panel-team", role: "tabpanel", "aria-labelledby": "tab-team" });
+  listView = h("div", { id: "panel-proposals", role: "tabpanel", "aria-labelledby": "tab-proposals", hidden: true });
   detailView = h("div", { hidden: true });
   const tabs = h("div", { class: "btn-row", role: "tablist", "aria-label": "Agents views" }, tabTeam, tabProposals);
   tabs.addEventListener("keydown", (ev) => {
@@ -531,25 +531,25 @@ function detailError(status: number, id: string): HTMLElement {
       status === 404 ? null : h("button", { type: "button", class: "btn btn--primary", testid: "retry-button", on: { click: () => void showDetail(id) } }, "Try again")));
 }
 
-type DiffKind = "add" | "del" | "ctx" | "hunk" | "meta";
+type DiffKind = "add" | "del" | "ctx" | "hunk" | "file";
 function classify(line: string, state: { inHunk: boolean }): { kind: DiffKind; text: string } {
   if (line.startsWith("diff --git") || line.startsWith("index ") || line.startsWith("--- ") || line.startsWith("+++ ") || /^(new|deleted) file mode|^similarity |^rename |^old mode|^new mode/.test(line)) {
     if (line.startsWith("diff --git")) state.inHunk = false;
-    return { kind: "meta", text: line };
+    return { kind: "file", text: line };
   }
   if (line.startsWith("@@")) { state.inHunk = true; return { kind: "hunk", text: line }; }
   if (state.inHunk && line.startsWith("+")) return { kind: "add", text: line.slice(1) };
   if (state.inHunk && line.startsWith("-")) return { kind: "del", text: line.slice(1) };
-  if (line.startsWith("\\")) return { kind: "meta", text: line };
+  if (line.startsWith("\\")) return { kind: "file", text: line };
   return { kind: "ctx", text: line.startsWith(" ") ? line.slice(1) : line };
 }
 
-const MARKER: Record<DiffKind, string> = { add: "+", del: "−", ctx: "", hunk: "", meta: "" };
+const MARKER: Record<DiffKind, string> = { add: "+", del: "−", ctx: " ", hunk: "", file: "" };
 
 function diffLine(kind: DiffKind, text: string): HTMLElement {
   // The marker is real text (+ or U+2212) in a span WITHOUT Sable's .diff__mark class, because that class
   // draws the same marker with CSS and it would show twice. See handoff OPEN.
-  return h("div", { class: `diff__line diff__line--${kind === "ctx" ? "ctx" : kind}`, testid: "diff-line", "data-kind": kind },
+  return h("div", { class: `diff__line diff__line--${kind === "file" ? "meta" : kind}`, testid: "diff-line", "data-kind": kind },
     h("span", { testid: "diff-marker", "data-marker": MARKER[kind] }, MARKER[kind]),
     h("span", {}, text === "" ? " " : text));
 }
@@ -725,7 +725,7 @@ function openReject(p: Proposal, trigger: HTMLElement): void {
         busy.v = false;
         const f: ApiFailure = isApiFailure(e) ? e : { status: 0, error: "network" };
         if (f.status === 401) return;
-        if (f.status === 403) { err.textContent = "Only the project owner can reject changes."; }
+        if (f.status === 403) { dlg.close(); showNoAccess(); return; }
         else if (f.status === 409) {
           dlg.close();
           await showDetail(p.id, { testid: "approve-decided", text: "This proposal was already decided.", kind: "info" });

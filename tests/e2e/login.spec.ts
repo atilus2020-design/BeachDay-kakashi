@@ -95,7 +95,7 @@ test.describe("login page", () => {
     await expect(page.getByTestId("forgot-form")).toBeVisible();
     await page.getByTestId("forgot-email-input").fill("nobody@beachday.test");
     await page.getByTestId("forgot-submit").click();
-    await expect(page.getByTestId("forgot-sent-message")).toHaveText("If that address has an account, we've sent a link to reset your password.");
+    await expect(page.getByTestId("forgot-sent-message")).toHaveText("If that address has an account, we've sent a link to reset your password. If no email arrives in a few minutes, check spam, then send it again.");
     await expect(page.getByTestId("forgot-back")).toBeVisible();
   });
 

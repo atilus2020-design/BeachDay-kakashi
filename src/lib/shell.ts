@@ -15,13 +15,13 @@ const NAV: { id: string; href: string; text: string; match: (p: string) => boole
 ];
 
 let signOutHandler: (() => void | Promise<void>) | null = null;
-let navEl: HTMLElement | null = null;
+let accountEl: HTMLElement | null = null;
 let authHidden = false;
 let liveEl: HTMLElement | null = null;
 
 function renderAuthSlot(): void {
-  if (!navEl) return;
-  navEl.querySelector("[data-auth-slot]")?.remove();
+  if (!accountEl) return;
+  accountEl.replaceChildren();
   if (authHidden) return;
   const path = location.pathname;
   let slot: HTMLElement | null = null;
@@ -31,7 +31,7 @@ function renderAuthSlot(): void {
   } else if (!path.startsWith("/login")) {
     slot = h("a", { href: "/login/", testid: "nav-signin", "data-auth-slot": true }, "Sign in");
   }
-  if (slot) navEl.append(slot);
+  if (slot) accountEl.append(slot);
 }
 
 /** Switch the auth slot after the page knows the session (null hides both Sign in and Sign out where the page shows its own). */
@@ -73,11 +73,13 @@ function buildHeader(header: HTMLElement): void {
   header.setAttribute("data-testid", "site-header");
   clear(header);
   const brand = h("a", { class: "site-header__brand", href: "/", testid: "nav-home", "aria-current": path === "/" || path === "/index.html" ? "page" : null }, "Beach Day");
-  navEl = h("nav", { class: "site-nav", "aria-label": "Site" });
+  // Account slot sits on the brand row so the header is at most two rows at 375 px.
+  accountEl = h("nav", { class: "site-nav", "aria-label": "Account" });
+  const navEl = h("nav", { class: "site-nav", "aria-label": "Site" });
   for (const n of NAV) {
     navEl.append(h("a", { href: n.href, testid: n.id, "aria-current": n.match(path) ? "page" : null }, n.text));
   }
-  header.append(brand, navEl);
+  header.append(brand, accountEl, navEl);
   renderAuthSlot();
 }
 

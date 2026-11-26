@@ -63,6 +63,13 @@ function showNoAccess(): void {
 }
 
 async function doSignOut(): Promise<void> {
+  try {
+    for (let i = sessionStorage.length - 1; i >= 0; i--) {
+      const k = sessionStorage.key(i);
+      if (k?.startsWith("bd-chat:")) sessionStorage.removeItem(k);
+    }
+  } catch { /* storage blocked */ }
+  transcripts.clear();
   try { await signOut(); } catch { /* still leave */ }
   location.assign("/login/");
 }
@@ -130,7 +137,8 @@ let listFilter: ProposalStatus | "all" = "pending";
 
 function route(): void {
   if (!teamView || !teamView.isConnected) return;
-  const hash = decodeURIComponent(location.hash.replace(/^#/, ""));
+  let hash = "";
+  try { hash = decodeURIComponent(location.hash.replace(/^#/, "")); } catch { hash = ""; } // malformed hash: team view
   teamView.hidden = listView.hidden = detailView.hidden = true;
   if (hash.startsWith("proposal/")) {
     setTabs("proposals");

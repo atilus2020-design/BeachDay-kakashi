@@ -42,12 +42,12 @@ The full tree, with an owner for each path, is in [build-plan.md §5](build-plan
 /
 ├─ index.html, agents/, login/, how-it-works/, resources/, guide/   # Vite multi-page entries (each dir has index.html)
 ├─ netlify.toml, package.json, vite.config.ts, tsconfig.json, .env.example, README.md
-├─ public/                      # copied as-is: manifest.webmanifest, icons/, offline.html, robots.txt
+├─ public/                      # copied as-is: manifest.webmanifest, icons/, offline.html, offline.css, robots.txt,
+│                               # sw.js (placeholders filled by scripts/inject-sw.mjs after vite build)
 ├─ src/
 │  ├─ pages/                    # one module per screen: home, agents, login, content
 │  ├─ lib/                      # api.ts, sse.ts, dom.ts, shell.ts; auth.ts (supabase-js client + helpers)
 │  ├─ pwa/                      # SW registration, install prompt
-│  ├─ sw.ts                     # service worker → dist/sw.js
 │  ├─ scoring/                  # pure scoring (doc 1)
 │  ├─ shared/contracts.ts       # request/response types shared with Functions (types only)
 │  ├─ data/beaches.json
@@ -59,13 +59,13 @@ The full tree, with an owner for each path, is in [build-plan.md §5](build-plan
 │  │                            # diff.ts, agents.ts, blobs.ts, budget.ts, audit.ts
 │  └─ _generated/agents-private.json   # build output, git-ignored
 ├─ supabase/migrations/         # profiles table, RLS policy, new-user trigger (D-007)
-├─ scripts/                     # build-agents.mjs, check-secrets.mjs
+├─ scripts/                     # build-agents.mjs, inject-sw.mjs, check-secrets.mjs
 ├─ tests/                       # unit, function, e2e, fixtures, mocks/upstreams.mjs
 ├─ .claude/agents/*.md          # the agent team (source of truth)
 └─ docs/
 ```
 
-Removed from the first draft: `auth.mts` and `_lib/session.ts` (D-006 replaced the password gate), and `agent-job.mts` / `job-status.mts` (background jobs deferred, see build-plan §1).
+Removed from the first draft: `auth.mts` and `_lib/session.ts` (D-006 replaced the password gate), `agent-job.mts` / `job-status.mts` (background jobs deferred, see build-plan §1), and `src/sw.ts` (the service worker is plain `public/sw.js`, build-plan §9.7).
 
 ## 3.3 Netlify Functions: platform facts
 
@@ -102,8 +102,8 @@ Source: https://docs.netlify.com/build/environment-variables/overview/
 | `SUPABASE_URL` | Functions | No | `https://<ref>.supabase.co`, for token and role checks |
 | `SUPABASE_PUBLISHABLE_KEY` | Functions | No (public by design) | `sb_publishable_…`, sent as `apikey` |
 | `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY` | Builds | No | Bundled into `login/` and `agents/` for supabase-js |
-| `DAILY_CHAT_LIMIT` | Functions | No | Budget knob |
-| `OPEN_METEO_BASE`, `ANTHROPIC_BASE_URL`, `GITHUB_API_URL` | Local/test only; unset in production | No | Point upstreams at the local mock server (build-plan §7) |
+| `DAILY_CHAT_LIMIT`, `DAILY_TOKEN_LIMIT` | Functions | No | Optional budget knobs, per user and global. Defaults when unset: 100 turns, 1,000,000 tokens per day (`_lib/budget.ts`) |
+| `OPEN_METEO_BASE`, `OPEN_METEO_MARINE_BASE`, `ANTHROPIC_BASE_URL`, `GITHUB_API_URL` | Local/test only; unset in production | No | Point upstreams at the local mock server (build-plan §7, §9.4) |
 
 **Never set:** a Supabase secret key (`sb_secret_…`), the `service_role` key or the Supabase JWT secret (D-008). `CONSOLE_PASSWORD_HASH` and `SESSION_SECRET` are no longer used (D-006).
 
@@ -118,12 +118,14 @@ Source: https://docs.netlify.com/build/data-and-storage/netlify-blobs/
 - Inside Functions, `siteID` and `token` are injected automatically. Keys are at most 600 bytes and can't start with `/`. Objects can be up to 5 GB, with metadata up to 2 KB.
 - `netlify dev` uses a sandboxed local store (production data is not readable locally).
 
-**Stores:** `proposals` (`proposal/<id>`), `budget` (`chat/<yyyy-mm-dd>`), `locks` (`approve`) and `audit` (`audit/<yyyy-mm-dd>/<ts>-<id>`, including the Supabase user id). There is no `auth` store: Supabase rate-limits logins (D-006). A `jobs` store returns only if background jobs are added later.
+**Stores** (all opened strong through `_lib/blobs.ts` `store(name)`; exact keys in build-plan §6): `proposals` (`proposal/<id>`), `budget` (`chat/<yyyy-mm-dd>/global`, `chat/<yyyy-mm-dd>/user/<userId>`), `locks` (`approve`) and `audit` (`audit/<yyyy-mm-dd>/<ts>-<requestId>-<rand>`, including the Supabase user id). There is no `auth` store: Supabase rate-limits logins (D-006). A `jobs` store returns only if background jobs are added later.
 
 ## 3.4 The forecast function
 
+The sketch below was the starting point. The built Function (`netlify/functions/forecast.mts`) differs in the ways listed after it.
+
 ```ts
-// netlify/functions/forecast.mts (sketch)
+// netlify/functions/forecast.mts (original sketch)
 import type { Config, Context } from "@netlify/functions";
 import beaches from "../../src/data/beaches.json" with { type: "json" };
 
@@ -162,26 +164,43 @@ Why use a proxy instead of calling Open-Meteo from the browser?
 
 **Error handling:** if one of the two APIs fails, return the other with `partial: true`. The UI then shows the score with a "wave data unavailable" note instead of failing completely.
 
-## 3.5 `netlify.toml` (starting point)
+**As built:**
+
+- Base URLs come from `OPEN_METEO_BASE` and `OPEN_METEO_MARINE_BASE` (build-plan §9.4); each upstream call has an 8 s timeout, and upstream bodies are never echoed.
+- 400 when `beach` is missing, 404 for an unknown beach, 405 for non-GET, **502 only when both upstreams fail**. Errors are `Cache-Control: no-store`.
+- Full answers: `Cache-Control: public, max-age=300` and `Netlify-CDN-Cache-Control: public, s-maxage=1800, stale-while-revalidate=600`. **Partial answers are CDN-cached for 60 s only** (`s-maxage=60`), so a short outage does not stick for 30 minutes.
+- The Function sets its own `X-Content-Type-Options: nosniff`, because Netlify headers don't apply to Function responses.
+- Each beach in `src/data/beaches.json` carries an `nwsUrl` (its NWS Surf Zone Forecast page). The home page's rip-current link uses it (D-002).
+
+## 3.5 `netlify.toml` (as built, abridged)
 
 ```toml
 [build]
-  command = "npm run build"        # builds all pages, runs scripts/build-agents.mjs and scripts/check-secrets.mjs
+  command = "npm run build"        # build:agents → vite build → scripts/inject-sw.mjs → scripts/check-secrets.mjs
   publish = "dist"
 
 [functions]
+  directory = "netlify/functions"
   node_bundler = "esbuild"
+  included_files = ["netlify/functions/_generated/*.json"]
 
 [[headers]]
   for = "/*"
   [headers.values]
     X-Content-Type-Options = "nosniff"
     Referrer-Policy = "strict-origin-when-cross-origin"
-    Permissions-Policy = "geolocation=(self), camera=(), microphone=()"
-    Content-Security-Policy = "default-src 'self'; connect-src 'self' https://<ref>.supabase.co; img-src 'self' data:; style-src 'self'; script-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+    Permissions-Policy = "camera=(), microphone=(), geolocation=()"
+    X-Frame-Options = "DENY"
+    Content-Security-Policy = "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; object-src 'none'; connect-src 'self' https://*.supabase.co; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; manifest-src 'self'; worker-src 'self'"
 
 [[headers]]
   for = "/agents/*"
+  [headers.values]
+    Cache-Control = "no-store"
+    X-Robots-Tag = "noindex"
+
+[[headers]]
+  for = "/login/*"
   [headers.values]
     Cache-Control = "no-store"
     X-Robots-Tag = "noindex"
@@ -192,14 +211,17 @@ Why use a proxy instead of calling Open-Meteo from the browser?
     Cache-Control = "no-cache"
 ```
 
-Open-Meteo, Claude and GitHub are reached only through our Functions. The browser talks to one other origin, the Supabase project, so `connect-src` is `'self'` plus that exact origin. Google sign-in is a top-level redirect to Supabase and Google, so it needs no `connect-src` entry. The netlify-engineer decides whether to write the exact project origin at build time or use `https://*.supabase.co` (build-plan, open items). Netlify headers don't apply to Function responses, so Functions set their own `Cache-Control: no-store`.
+`netlify.toml` itself is the source of truth; this copy only shows the shape. `geolocation=()` is off because the app never asks for location.
+
+Open-Meteo, Claude and GitHub are reached only through our Functions. The browser talks to one other origin, the Supabase project, so `connect-src` is `'self'` plus that exact origin. Google sign-in is a top-level redirect to Supabase and Google, so it needs no `connect-src` entry. **Decided:** `netlify.toml` ships `https://*.supabase.co`, and `scripts/check-secrets.mjs` appends a `dist/_headers` override that pins `connect-src` to the exact `VITE_SUPABASE_URL` origin at build time (security.md B4). `object-src 'none'` blocks plugin content. Netlify headers don't apply to Function responses, so Functions set their own `Cache-Control: no-store`.
 
 ## 3.6 Build-time agent manifest
 
 `scripts/build-agents.mjs` reads `.claude/agents/*.md`, parses the YAML frontmatter (`name`, `description`, `model`, `tools`, …) and the Markdown body (the system prompt and personality), and writes two files, both bundled into the Functions only:
 
 - `netlify/functions/_generated/agents.json` holds the summary fields only: `name`, `description`, `model`, `personality` (a short summary or the first paragraph) and `color`/`emoji` if present. `GET /api/agents` serves it to `super_admin` only. It is **not** published as a static file in `dist/` (D-007).
-- `netlify/functions/_generated/agents-private.json` holds the **full system prompts**. It is bundled into the functions only (via `included_files` or a direct import), so the server, not the browser, decides which prompt an agent runs with.
+- `netlify/functions/_generated/agents-private.json` holds, per agent, `{ model, system }`: the **full system prompt** (agent body + its skills + its knowledge text, capped at about 120,000 characters, build-plan §9.3). It is bundled into the functions only (direct JSON import plus `included_files`), so the server, not the browser, decides which prompt and model an agent runs with. Models are checked against an allow-list at build time and again at runtime.
+- `knowledge/**` is compiled into these prompts, so it is on the proposal deny-list (`_lib/allowlist.ts`). Only a human edits it.
 
 Agent file changes go through Git like everything else, so the list updates on every deploy.
 
@@ -208,7 +230,7 @@ Agent file changes go through Git like everything else, so the list updates on e
 - `npm i -g netlify-cli`, then `netlify dev` runs the static site, the functions and local Blobs together.
 - Put local secrets in `.env` (git-ignored) or `netlify env:set` with the Local development context.
 - Use separate low-limit keys for development: a Claude workspace with a small spend limit, and a GitHub token for a **fork or sandbox repository**.
-- **Tests need no real secrets.** `tests/mocks/upstreams.mjs` imitates Open-Meteo, Anthropic, GitHub and Supabase. The Functions are pointed at it with `OPEN_METEO_BASE`, `ANTHROPIC_BASE_URL`, `GITHUB_API_URL` and `SUPABASE_URL`. Playwright fulfils the browser's supabase-js calls with `page.route` (build-plan §7). `_lib/auth.ts` accepts a non-https `SUPABASE_URL` only in the `dev` context.
+- **Tests need no real secrets.** `tests/mocks/upstreams.mjs` imitates Open-Meteo, Anthropic, GitHub and Supabase. The Functions are pointed at it with `OPEN_METEO_BASE`, `OPEN_METEO_MARINE_BASE`, `ANTHROPIC_BASE_URL`, `GITHUB_API_URL` and `SUPABASE_URL`. Playwright fulfils the browser's supabase-js calls with `page.route` (build-plan §7). `_lib/auth.ts` accepts a non-https `SUPABASE_URL` only for a loopback host, and only in the `dev` context or under vitest (`NODE_ENV=test`, build-plan §9.5).
 
 ## 3.8 Decisions to confirm
 

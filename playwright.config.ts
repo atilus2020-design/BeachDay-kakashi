@@ -9,6 +9,12 @@ const chromiumOnly = (name: keyof typeof devices) => {
 };
 
 const testEnv = loadTestEnv();
+const appEnv = {
+  ...(process.env as Record<string, string>),
+  ...testEnv,
+  VITE_SUPABASE_URL: "https://beachday-test.supabase.co",
+  VITE_SUPABASE_PUBLISHABLE_KEY: "sb_publishable_test",
+};
 const mockPort = process.env.MOCK_PORT || "9100";
 
 export default defineConfig({
@@ -37,17 +43,22 @@ export default defineConfig({
       timeout: 15_000,
       env: { MOCK_PORT: mockPort },
     },
-    {
-      command: "npx netlify dev --port 8888 --offline",
-      url: "http://localhost:8888",
-      reuseExistingServer: !process.env.CI,
-      timeout: 180_000,
-      env: {
-        ...(process.env as Record<string, string>),
-        ...testEnv,
-        VITE_SUPABASE_URL: "https://beachday-test.supabase.co",
-        VITE_SUPABASE_PUBLISHABLE_KEY: "sb_publishable_test",
-      },
-    },
+    process.env.E2E_NETLIFY_DEV
+      ? {
+          command: "npx netlify dev --port 8888 --offline",
+          url: "http://localhost:8888",
+          reuseExistingServer: !process.env.CI,
+          timeout: 180_000,
+          env: appEnv,
+        }
+      : {
+          // `netlify dev` needs network for its Edge Functions bootstrap, so by default we build for production
+          // (skipping check-secrets, which has its own gate) and serve dist/ + the Function handlers in-process.
+          command: "node scripts/build-agents.mjs && npx vite build && node scripts/inject-sw.mjs && node tests/mocks/e2e-server.mjs",
+          url: "http://localhost:8888/api/forecast?beach=south-beach",
+          reuseExistingServer: !process.env.CI,
+          timeout: 300_000,
+          env: appEnv,
+        },
   ],
 });

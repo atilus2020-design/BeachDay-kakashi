@@ -299,7 +299,7 @@ Append an audit entry to Blobs for each login, failed login, chat turn (agent, t
 
 **Headers:** `Authorization: Bearer $GITHUB_TOKEN`, `Accept: application/vnd.github+json`, `X-GitHub-Api-Version: 2026-03-10` (the current version shown in the docs; pin it in one constant), and a `User-Agent`.
 
-**Optional safer mode (recommended as a toggle):** "Approve to preview". Commit to the branch `agent/<proposal-id>`, open a pull request, and let Netlify build a **Deploy Preview**. Then click "Merge and deploy" once the preview looks right. This needs the **Pull requests: write** permission on the token as well, and is worth it once agents make non-trivial UI changes.
+**Not adopted (D-003 — Approve commits straight to `main`).** For reference only: "Approve to preview". Commit to the branch `agent/<proposal-id>`, open a pull request, and let Netlify build a **Deploy Preview**. Then click "Merge and deploy" once the preview looks right. This needs the **Pull requests: write** permission on the token as well, and is worth it once agents make non-trivial UI changes.
 
 ## 4.7 Long agent jobs within Netlify's time limits
 
@@ -350,6 +350,7 @@ Append an audit entry to Blobs for each login, failed login, chat turn (agent, t
 
 ## 4.10 Open questions
 
-- Commit directly to `main` (as specified) or default to the preview and pull-request mode? The suggestion is to build both, with `main` as the default and a toggle.
+- **Decided (D-003):** commit directly to `main`.
+- **Decided (D-005):** a fine-grained personal access token for this repository only, with Contents read/write and Metadata read.
 - Should agents get a `run_tests` tool? Not inside Netlify Functions: there is no repository checkout or toolchain. If wanted, have the approve step open a pull request and let GitHub Actions run tests. That needs a separate, human-managed workflow, not one written by agents.
 - Single owner vs several users? Single owner is enough for now; use Netlify Identity or OAuth if that changes.

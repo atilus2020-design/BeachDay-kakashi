@@ -189,4 +189,5 @@ Agent file changes go through Git like everything else, so the list updates on e
 ## 3.8 Decisions to confirm
 
 - Framework: vanilla TS plus Vite is suggested (small bundle, simple service worker). Preact or Svelte are fine if the UI grows.
-- Should approve commit to `main` directly (as specified), or to an `agent/<id>` branch with a pull request, so a **Netlify Deploy Preview** can be checked before merging? Doc 4 §4.6 recommends supporting both, with direct-to-main as the default the user asked for.
+- **Decided (D-003):** Approve commits straight to `main`; there is no pull-request mode.
+- **Decided (D-004):** Netlify Free plan. Background functions are available on credit-based Free plans.

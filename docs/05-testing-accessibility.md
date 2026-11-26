@@ -16,7 +16,7 @@
 - A thunderstorm code (95/96/99) in 2 or more window hours caps the day at 20, the label is "No-go: lightning", and the reasons mention lightning.
 - A thunderstorm only at 19:00 (outside the window) does **not** veto.
 - Apparent temperature of 104 °F lowers the score with the "Danger" heat reason; 85 °F has no penalty.
-- Wave height of 1.5 ft gives full wave points; 4 ft with an 11 s period applies the rip-proxy penalty.
+- Wave height of 1.5 ft gives full wave points; 4 ft loses most wave points; wave period never changes the score (no rip proxy, D-002).
 - UV 11 gives an "extreme" badge but **no** score penalty.
 - Missing marine data gives a score from weather only, with `partial: true` and the reason "wave data unavailable".
 - Timezone: the window uses local times from `timezone=America/New_York`, including across the DST change (test the early-November and mid-March dates).

@@ -39,7 +39,7 @@ Source: https://open-meteo.com/en/docs/marine-weather-api
 | Purpose | Hourly variable(s) | Daily variable(s) |
 |---|---|---|
 | Surf size | `wave_height`, `wind_wave_height`, `swell_wave_height` | `wave_height_max`, `swell_wave_height_max` |
-| Surf character (used as a rip proxy) | `wave_period`, `swell_wave_period`, `swell_wave_peak_period`, `wave_direction`, `swell_wave_direction` | `wave_period_max`, `swell_wave_period_max`, `wave_direction_dominant` |
+| Surf character (display only; not scored, D-002) | `wave_period`, `swell_wave_period`, `swell_wave_peak_period`, `wave_direction`, `swell_wave_direction` | `wave_period_max`, `swell_wave_period_max`, `wave_direction_dominant` |
 | Water temperature | `sea_surface_temperature` | *(none: compute it from hourly data)* |
 | Tide-ish | `sea_level_height_msl` (includes ocean tides and the inverted-barometer effect) | — |
 | Currents | `ocean_current_velocity`, `ocean_current_direction` | — |
@@ -97,7 +97,7 @@ Thunderstorm codes in the WMO table (Open-Meteo docs): 95 is a thunderstorm, and
 | **Rain** | 30% | hourly `precipitation_probability`, `weather_code` | PoP ≤ 10% and code 0–3 | PoP ≥ 70%, or rain codes 61–67 / 80–82 | WMO codes from Open-Meteo docs; thresholds are product judgment |
 | **Feels-like** | 20% | `apparent_temperature` (°F) | 78–90 °F | ≤ 65 °F or ≥ 108 °F; −15 points per band above 90 (Caution 80–90, Extreme Caution 90–103, Danger 103–124) | NWS heat index categories, https://www.weather.gov/ama/heatindex (note: the chart is for shade; full sun can add up to 15 °F) |
 | **Wind** | 15% | `wind_speed_10m`, `wind_gusts_10m` (mph) | sustained ≤ 12 mph (Beaufort ≤ 3, gentle breeze) | sustained ≥ 25 mph (Beaufort 6); minus 10 if gusts exceed sustained by more than 10 mph | NWS Miami Beaufort scale: gentle 8–12 mph, moderate 13–18, fresh 19–24. https://www.weather.gov/mfl/beaufort |
-| **Waves** | 15% | `wave_height` (ft), `wave_period` (s) | ≤ 2 ft | ≥ 5 ft; minus 15 if period ≥ 10 s with height ≥ 3 ft (long-period swell is a rip-risk proxy) | Product judgment; label it as a proxy and link the NWS Surf Zone Forecast |
+| **Waves** | 15% | `wave_height` (ft) | ≤ 2 ft | ≥ 5 ft (linear between) | Product judgment. **No rip-current proxy (decision D-002)**: rip risk is only a link to the NWS Surf Zone Forecast |
 | **Sky** | 10% | `cloud_cover` (%) | ≤ 30% | ≥ 90% | Product judgment |
 | **Water temperature** | 10% | `sea_surface_temperature` (°F) | ≥ 80 °F | ≤ 68 °F (linear between) | Product judgment for South Florida (summer water is often in the mid-80s °F) |
 
@@ -193,5 +193,5 @@ From https://open-meteo.com/en/terms:
 ## 1.7 Open questions
 
 - Should the score have **personas** (swimmer, sunbather, surfer)? A surfer wants 3–5 ft waves, the opposite of a swimmer. A weight preset per persona is cheap to add later because the config is separate.
-- Should we fetch **NWS rip-current risk** via the NWS API (api.weather.gov) for the first one or two days? That adds a second data source and its own failure modes. Spike it before committing.
+- ~~Fetch NWS rip-current risk?~~ **Decided (D-002):** no rip-current proxy and no NWS fetch. Link out to the NWS Surf Zone Forecast (https://forecast.weather.gov/product.php?site=MFL&issuedby=MFL&product=SRF) and https://www.weather.gov/beach/florida.
 - Should water temperature use **a daily mean or the mid-day value**? Mid-day is simpler and close enough.

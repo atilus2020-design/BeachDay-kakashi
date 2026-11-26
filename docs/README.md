@@ -11,6 +11,8 @@ These docs give context to the expert agents who will build the app. Each file c
 | 3 | [03-architecture.md](03-architecture.md) | A static Netlify site plus Netlify Functions: folder layout, endpoints, caching, environment variables and platform limits |
 | 4 | [04-agent-console.md](04-agent-console.md) | The Agent Console: listing agents, chat through a function, propose → approve → commit → redeploy, the security model, and long jobs within Netlify's time limits |
 | 5 | [05-testing-accessibility.md](05-testing-accessibility.md) | Test strategy (unit, contract, function, end-to-end, PWA) and accessibility requirements (WCAG 2.2 AA) |
+| — | [decisions.md](decisions.md) | **Decision records** D-001 to D-005: PWA on Netlify, no rip proxy, Approve → `main`, Free plan, fine-grained token |
+| — | [expert-roster.md](expert-roster.md) | The agent team: roles, skills, and which agents share each skill |
 
 ## Decisions at a glance
 

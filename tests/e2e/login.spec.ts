@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { mockSupabase, SUPABASE, resetMocks, noHorizontalScroll, expectNoSeriousAxe, expectTarget44 } from "./helpers.ts";
+import { mockSupabase, seedSession, SUPABASE, resetMocks, noHorizontalScroll, expectNoSeriousAxe, expectTarget44 } from "./helpers.ts";
 
 test.use({ serviceWorkers: "block" });
 test.beforeEach(async ({ context }) => { await resetMocks(); await mockSupabase(context); });
@@ -108,10 +108,7 @@ test.describe("login page", () => {
   });
 
   test("already signed in shows the signed-in state and signs out", async ({ page, context }) => {
-    await context.addInitScript(() => {
-      const exp = Math.floor(Date.now() / 1000) + 3600;
-      localStorage.setItem("sb-beachday-test-auth-token", JSON.stringify({ access_token: "tok_user", token_type: "bearer", expires_in: 3600, expires_at: exp, refresh_token: "refresh_tok_user", user: { id: "00000000-0000-4000-8000-000000000002", aud: "authenticated", email: "user@beachday.test", app_metadata: {}, user_metadata: {} } }));
-    });
+    await seedSession(context, "tok_user");
     await page.goto("/login/");
     await expect(page.getByTestId("login-signed-in")).toContainText("user@beachday.test");
     await expect(page.getByTestId("login-form")).toHaveCount(0);

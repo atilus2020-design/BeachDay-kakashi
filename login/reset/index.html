@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>New password · Beach Day</title>
+  <meta name="description" content="Choose a new password for your Beach Day account.">
+  <meta name="robots" content="noindex">
+  <meta name="referrer" content="no-referrer">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <meta name="theme-color" content="#0b3d5c">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon-180.png">
+  <link rel="icon" href="/icons/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/src/styles/base.css">
+</head>
+<body>
+  <header class="site-header" data-shell></header>
+  <noscript>
+    <nav class="site-nav" aria-label="Site">
+      <a href="/">Beach Day</a>
+      <a href="/agents/">Agents</a>
+      <a href="/how-it-works/">How it works</a>
+      <a href="/resources/">Resources</a>
+    </nav>
+  </noscript>
+
+  <main id="main" class="page">
+    <div class="auth-card stack">
+      <h1 class="page-title" id="reset-title">Choose a new password</h1>
+      <noscript><p class="form-error" role="alert">Resetting your password needs JavaScript. Turn it on and reload this page.</p></noscript>
+
+      <!-- The one form-level error on the page; the script moves it into the form when the form shows. -->
+      <p class="form-error" role="alert" id="form-error" data-testid="form-error" hidden></p>
+
+      <p data-testid="reset-checking" id="reset-checking" role="status">Checking your link…</p>
+
+      <form id="reset-form" data-testid="reset-form" aria-labelledby="reset-title" novalidate hidden>
+        <!-- Hidden username helps password managers save the new password against the right account. -->
+        <input type="email" id="reset-username" name="username" autocomplete="username" hidden>
+        <div class="field">
+          <label class="field__label" for="new-password">New password</label>
+          <input class="input" id="new-password" name="new-password" type="password" autocomplete="new-password" required aria-describedby="password-hint" data-testid="new-password-input">
+          <p class="field__hint" id="password-hint" data-testid="password-hint">At least 12 characters.</p>
+          <p class="field__error" id="password-error" data-testid="password-error" hidden></p>
+          <label class="field__hint"><input type="checkbox" id="show-password" data-testid="show-password"> Show password</label>
+        </div>
+        <button type="submit" class="btn btn--primary btn--block" id="reset-submit" data-testid="reset-submit">Save new password</button>
+      </form>
+
+      <section id="invalid-view" data-testid="reset-invalid-link" hidden>
+        <p>This reset link has expired or was already used.</p>
+        <a class="btn btn--primary btn--block" href="/login/#forgot">Send a new link</a>
+      </section>
+
+      <section id="success-view" hidden>
+        <p data-testid="reset-success" role="status">Password updated. You're signed in.</p>
+        <a class="btn btn--primary btn--block" href="/" data-testid="continue-button">Continue</a>
+      </section>
+    </div>
+  </main>
+
+  <footer class="site-footer" data-shell></footer>
+  <script type="module" src="/src/pages/login-reset.ts"></script>
+</body>
+</html>

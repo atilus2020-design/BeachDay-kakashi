@@ -71,7 +71,7 @@ export async function mockSupabase(context: BrowserContext, opts: { signupOk?: b
 
 /** Pre-seeds a signed-in supabase-js session (storage key sb-<project ref>-auth-token). */
 export async function seedSession(context: BrowserContext, tok: Tok) {
-  await context.addInitScript(([key, value]) => { try { localStorage.setItem(key, value); } catch { /* ignore */ } }, ["sb-beachday-test-auth-token", JSON.stringify(session(tok))] as const);
+  await context.addInitScript(([key, value]) => { try { if (!sessionStorage.getItem("e2e-seeded")) { sessionStorage.setItem("e2e-seeded", "1"); localStorage.setItem(key, value); } } catch { /* ignore */ } }, ["sb-beachday-test-auth-token", JSON.stringify(session(tok))] as const);
 }
 
 export async function signedInAs(context: BrowserContext, tok: Tok) {
@@ -84,7 +84,7 @@ export async function noHorizontalScroll(page: Page) {
 }
 
 export async function expectNoSeriousAxe(page: Page, label = "") {
-  const r = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"]).analyze();
+  const r = await new AxeBuilder({ page: page as any }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"]).analyze();
   const bad = r.violations.filter((v) => v.impact === "serious" || v.impact === "critical");
   expect(bad.map((v) => `${label} ${v.id}: ${v.nodes.slice(0, 2).map((n) => n.target.join(" ")).join(" | ")}`)).toEqual([]);
 }

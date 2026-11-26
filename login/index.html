@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Sign in · Beach Day</title>
+  <meta name="description" content="Sign in to Beach Day or create an account.">
+  <meta name="robots" content="noindex">
+  <meta name="referrer" content="no-referrer">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <meta name="theme-color" content="#0b3d5c">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon-180.png">
+  <link rel="icon" href="/icons/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/src/styles/base.css">
+</head>
+<body>
+  <header class="site-header" data-shell></header>
+  <noscript>
+    <nav class="site-nav" aria-label="Site">
+      <a href="/">Beach Day</a>
+      <a href="/agents/">Agents</a>
+      <a href="/how-it-works/">How it works</a>
+      <a href="/resources/">Resources</a>
+    </nav>
+  </noscript>
+
+  <main id="main" class="page">
+    <div class="auth-card stack">
+      <h1 class="page-title" id="login-title">Sign in to Beach Day</h1>
+      <noscript><p class="form-error" role="alert">Sign-in needs JavaScript. Turn it on and reload this page.</p></noscript>
+
+      <p class="text-2" data-testid="login-context" id="login-context" hidden>Agents is for the project owner.</p>
+
+      <!-- The one form-level error on the page. The script moves it next to the active form's button
+           (or leaves it here for page-level problems such as "Sign-in isn't configured."). -->
+      <p class="form-error" role="alert" id="form-error" data-testid="form-error" hidden></p>
+
+      <!-- Log in / sign up -->
+      <section id="auth-view" aria-labelledby="login-title" hidden>
+        <button type="button" class="btn btn--secondary btn--block" data-testid="google-button" id="google-button">Continue with Google</button>
+        <p class="divider" aria-hidden="true">or</p>
+
+        <div class="btn-row" role="tablist" aria-label="Log in or sign up">
+          <button type="button" class="btn btn--secondary" role="tab" id="tab-login" data-testid="auth-tab-login" aria-selected="true" aria-controls="auth-form">Log in</button>
+          <button type="button" class="btn btn--secondary" role="tab" id="tab-signup" data-testid="auth-tab-signup" aria-selected="false" aria-controls="auth-form" tabindex="-1">Sign up</button>
+        </div>
+
+        <form id="auth-form" data-testid="login-form" role="tabpanel" aria-labelledby="tab-login" novalidate>
+          <div class="field">
+            <label class="field__label" for="email">Email</label>
+            <input class="input" id="email" name="email" type="email" autocomplete="email" inputmode="email" autocapitalize="none" spellcheck="false" required data-testid="email-input">
+            <p class="field__error" id="email-error" data-testid="email-error" hidden></p>
+          </div>
+          <div class="field">
+            <label class="field__label" for="password">Password</label>
+            <input class="input" id="password" name="password" type="password" autocomplete="current-password" required data-testid="password-input">
+            <p class="field__hint" id="password-hint" data-testid="password-hint" hidden>At least 12 characters.</p>
+            <p class="field__error" id="password-error" data-testid="password-error" hidden></p>
+            <label class="field__hint"><input type="checkbox" id="show-password" data-testid="show-password"> Show password</label>
+          </div>
+          <button type="submit" class="btn btn--primary btn--block" id="submit-button" data-testid="submit-button">Log in</button>
+        </form>
+        <p><a href="#forgot" id="forgot-link" data-testid="forgot-link">Forgot password?</a></p>
+      </section>
+
+      <!-- Confirm email (after sign up) -->
+      <section id="confirm-view" hidden>
+        <p data-testid="confirm-email-message" id="confirm-email-message"></p>
+        <button type="button" class="btn btn--secondary btn--block" data-testid="signup-restart" id="signup-restart">Use a different email</button>
+      </section>
+
+      <!-- Forgot password -->
+      <section id="forgot-view" aria-labelledby="forgot-title" hidden>
+        <form id="forgot-form" data-testid="forgot-form" novalidate>
+          <h2 id="forgot-title">Reset your password</h2>
+          <p class="text-2">Enter your email and we'll send a link.</p>
+          <div class="field">
+            <label class="field__label" for="forgot-email">Email</label>
+            <input class="input" id="forgot-email" name="email" type="email" autocomplete="email" inputmode="email" autocapitalize="none" spellcheck="false" required data-testid="forgot-email-input">
+            <p class="field__error" id="forgot-email-error" hidden></p>
+          </div>
+          <button type="submit" class="btn btn--primary btn--block" id="forgot-submit" data-testid="forgot-submit">Send reset link</button>
+        </form>
+        <p data-testid="forgot-sent-message" id="forgot-sent-message" role="status" hidden>If that address has an account, we've sent a link to reset your password.</p>
+        <p><a href="#" id="forgot-back" data-testid="forgot-back">Back to log in</a></p>
+      </section>
+
+      <!-- Signed in: either back from the confirmation link, or visiting /login/ with a session -->
+      <section id="signed-in-view" hidden>
+        <p data-testid="login-confirmed" id="login-confirmed" hidden>Email confirmed. You're signed in.</p>
+        <p data-testid="login-signed-in" id="login-signed-in" hidden></p>
+        <div class="btn-row">
+          <a class="btn btn--primary" href="/" data-testid="continue-button" id="continue-button">Continue</a>
+          <button type="button" class="btn btn--secondary" data-testid="signout-button" id="signout-button">Sign out</button>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <footer class="site-footer" data-shell></footer>
+  <script type="module" src="/src/pages/login.ts"></script>
+</body>
+</html>

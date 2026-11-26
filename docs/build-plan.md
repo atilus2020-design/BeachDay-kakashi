@@ -370,3 +370,31 @@ Goal: every unit, function and e2e test runs with **no real key, token or Supaba
 | An agent proposes a change to auth code or migrations | Medium | High | Deny `supabase/**`, `login/**`, `src/lib/auth.*` in the allow-list at propose and at approve; human reviews the diff | security-engineer |
 | Open sign-up attracts spam accounts | Medium | Low | Accounts get role `user` (nothing to gain); Supabase rate limits; CAPTCHA or disabling sign-up later if needed | supabase-auth-engineer |
 | Two Supabase round-trips per protected call add latency | High | Low | Acceptable at this volume; JWKS verification can drop one round-trip later (D-008) | supabase-auth-engineer |
+
+## 9. Orchestrator decisions for the build (binding for every expert)
+
+1. **Dependencies are frozen.** The orchestrator installed `package.json` (vite 8, vitest 5, @playwright/test 1.63.0 matching the pre-installed Chromium, @netlify/functions 6, @netlify/blobs 11, @anthropic-ai/sdk, @supabase/supabase-js 2, diff 9, @axe-core/playwright, netlify-cli 27, typescript 5). **Don't run `npm install` or edit `package.json`.** If you need something new, say so under OPEN in your handoff. The `scripts` in `package.json` are fixed: `build` = `build:agents` → `vite build` → `node scripts/inject-sw.mjs` → `node scripts/check-secrets.mjs`.
+2. **TypeScript and imports.** Front end in `src/**/*.ts`, Functions in `netlify/functions/*.mts` with helpers in `netlify/functions/_lib/*.ts`. Import local files **with the `.ts` extension** (`import { requireRole } from "./_lib/auth.ts"`); tsconfig sets `allowImportingTsExtensions` and `noEmit`. No framework.
+3. **Agent knowledge (lead's requirement).** `AgentSummary` gains `knowledge: { path: string; title: string }[]`, listing the files under `knowledge/<agent>/docs` and `examples`. `scripts/build-agents.mjs` writes:
+   - `netlify/functions/_generated/agents.json`: public summaries;
+   - `agents-private.json`: per agent, `{ model, system }`, where `system` = the agent body + every skill in its `skills:` list (`.claude/skills/<s>/SKILL.md`) + the text of its knowledge files (skip fixtures over 20 KB and binary files; cap at about 120,000 characters total, truncating examples first).
+
+   Each agent therefore answers with **its own instructions, knowledge and model** (opus→`claude-opus-5-5`, sonnet→`claude-sonnet-5-5`, haiku→`claude-haiku-5-5`). Functions import the JSON; `_generated/` is git-ignored and built before `vite build` and before tests (`npm run build:agents`).
+4. **Upstream base URLs (mockable).**
+   - Forecast: `OPEN_METEO_BASE` (default `https://api.open-meteo.com`, path `/v1/forecast`).
+   - Marine: `OPEN_METEO_MARINE_BASE` (default `https://marine-api.open-meteo.com`, path `/v1/marine`).
+   - Claude: `ANTHROPIC_BASE_URL` (the SDK reads it; it appends `/v1/messages`).
+   - GitHub: `GITHUB_API_URL` (default `https://api.github.com`).
+   - Supabase: `SUPABASE_URL`.
+
+   The mock server `tests/mocks/upstreams.mjs` listens on `127.0.0.1:9100` with prefixes `/open-meteo`, `/marine`, `/anthropic`, `/github` and `/supabase`, and records requests at `GET /__calls` (`DELETE` to reset). `tests/mocks/test.env` sets all of these, plus `GITHUB_REPO=atilus2020-design/BeachDay-kakashi`, `GITHUB_TOKEN=test-token`, `ANTHROPIC_API_KEY=test-key` and `SUPABASE_PUBLISHABLE_KEY=sb_publishable_test`. Mock tokens: `tok_super_admin`, `tok_user`, `tok_expired`.
+5. **http Supabase URL** is accepted only when `context?.deploy?.context === "dev"` (`netlify dev`) or `process.env.NODE_ENV === "test"` (vitest). Everywhere else it must be https.
+6. **Blobs in tests.** `_lib/blobs.ts` exports `store(name)`. It uses `getStore({ name, consistency: "strong" })` normally, and an in-memory implementation with the same subset (`get(key,{type:"json"})`, `getWithMetadata`, `setJSON(key,v,{onlyIfNew,onlyIfMatch})` returning `{modified, etag}`, `delete`, `list({prefix})`) when `NODE_ENV === "test"`. Under `netlify dev` the real local sandbox is used.
+7. **Service worker** is plain JS at `public/sw.js`, with `__VERSION__` and `__PRECACHE__` placeholders. `scripts/inject-sw.mjs` (pwa-mobile-engineer) rewrites `dist/sw.js` after `vite build` with the build hash and the list of built shell assets. There is no `src/sw.ts`.
+8. **Page shell.** Every HTML page has `<header class="site-header" data-shell></header>` … `<footer class="site-footer" data-shell></footer>`. `src/lib/shell.ts` (frontend) exports `mountShell()`, which fills them:
+   - nav: Beach Day (home), Agents, How it works, Resources;
+   - footer: Resources · Guide (`/guide/`) · GitHub repo (`https://github.com/atilus2020-design/BeachDay-kakashi`) · API directory (`https://mcp-api.netlify.app/`) · "Weather data by Open-Meteo.com" · "A planning aid, not a safety service."
+
+   Content pages load `/src/pages/content.ts`, which calls `mountShell()`. Each page also includes a `<noscript>` fallback with the same links.
+9. **Ports.** Vite dev runs on 5173. `netlify dev` runs on 8888 and proxies Vite and runs the Functions. Playwright starts the mocks plus `netlify dev` with `tests/mocks/test.env`.
+10. **Experts never commit or push.** Each one returns a handoff packet of 400 words or fewer: DELIVERED, CONTRACTS, TESTS RUN (with results), OPEN.

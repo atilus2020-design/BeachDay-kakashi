@@ -1,10 +1,10 @@
 // Runs schema.sql in PGlite (in-process Postgres) with a stub of Supabase's auth schema and roles,
-// then proves the RLS and role-protection rules. Run: npm install && node test-schema.mjs
+// then proves the RLS and role-protection rules, and applies supabase/migrations/20261126000000_profiles.sql to a fresh db. Run: npm install && node test-schema.mjs
 import { PGlite } from "@electric-sql/pglite";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 
 const db = new PGlite();
-await db.exec(`
+const STUB = `
   create role anon nologin; create role authenticated nologin; create role supabase_auth_admin nologin;
   create schema auth;
   create table auth.users (id uuid primary key default gen_random_uuid(), email text, raw_user_meta_data jsonb);
@@ -13,7 +13,9 @@ await db.exec(`
   grant usage on schema public, auth to anon, authenticated;
   grant execute on function auth.uid() to anon, authenticated;
   grant usage on schema auth to supabase_auth_admin; grant insert on auth.users to supabase_auth_admin;
-`);
+`;
+await db.exec(STUB);
+
 await db.exec(readFileSync(new URL("./schema.sql", import.meta.url), "utf8"));
 await db.exec(readFileSync(new URL("./schema.sql", import.meta.url), "utf8")); // idempotent: second run must not fail
 
@@ -74,5 +76,19 @@ r = await as("authenticated", A, "select role from public.profiles");
 check("manual SQL-editor promotion works; A now reads role super_admin", r.rows[0]?.role === "super_admin");
 r = await as("authenticated", B, "select role from public.profiles");
 check("user B still 'user'", r.rows.length === 1 && r.rows[0].role === "user");
+
+// The committed migration itself (not re-runnable by design) must apply cleanly to a fresh database
+// and produce the same policy and grants as schema.sql.
+const mig = new URL("../../../supabase/migrations/20261126000000_profiles.sql", import.meta.url);
+if (existsSync(mig)) {
+  const fresh = new PGlite();
+  await fresh.exec(STUB);
+  let err = null; try { await fresh.exec(readFileSync(mig, "utf8")); } catch (e) { err = e.message; }
+  const p2 = err ? [] : (await fresh.query(`select polcmd from pg_policy where polrelid = 'public.profiles'::regclass`)).rows;
+  const g2 = err ? [] : (await fresh.query(`select grantee, privilege_type from information_schema.role_table_grants
+    where table_schema = 'public' and table_name = 'profiles' and grantee in ('anon','authenticated')`)).rows;
+  check("migration file applies to a fresh db; 1 SELECT policy; SELECT-only grant",
+    !err && p2.length === 1 && p2[0].polcmd === "r" && g2.length === 1 && g2[0].privilege_type === "SELECT", err ?? JSON.stringify(g2));
+}
 
 process.exit(bad ? 1 : 0);

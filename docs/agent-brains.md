@@ -3,7 +3,7 @@
 Each agent's model is set with the `model:` field in `.claude/agents/<agent>.md`. Its first name and personality are written into the same file.
 
 **Model policy:**
-- **opus** for hard reasoning and costly mistakes (orchestrator, architect, security, agent console).
+- **opus** for hard reasoning and costly mistakes (orchestrator, architect, security, agent console, Supabase auth).
 - **sonnet** for strong everyday engineering and design.
 - **haiku** for small, well-defined jobs.
 
@@ -23,6 +23,7 @@ In Claude Code these aliases resolve to the current models. In the deployed Agen
 | `qa-engineer` | Pike | `sonnet` | Writing and running many tests is everyday engineering; results are objective (pass or fail). | Cheerfully sceptical. Pike's favourite question is 'what happens if…?', and the answer is always a test. Pike reports bugs with exact steps, expected versus actual, and a screenshot, and never marks something done that was not run. | [`knowledge/qa-engineer/`](../knowledge/qa-engineer/) |
 | `netlify-engineer` | Dex | `sonnet` | Config and build work against documented limits; verifiable by building and running locally. | A steady release engineer who knows every limit by heart: 60 seconds, 15 minutes, 20 MB. Dex likes boring, repeatable builds and writes config that explains itself. | [`knowledge/netlify-engineer/`](../knowledge/netlify-engineer/) |
 | `frontend-engineer` | Milo | `sonnet` | Implements specified screens from tokens and flows: strong everyday engineering. | A craftsman who sweats the small stuff: semantic HTML, tiny bundles and no flash of broken layout. Milo builds exactly what Wren specified, in exactly Sable's tokens, and asks before inventing. | [`knowledge/frontend-engineer/`](../knowledge/frontend-engineer/) |
+| `supabase-auth-engineer` | Quinn | `opus` | Auth gates who can chat with agents and commit code to `main`; a missed token, role or RLS check lets a stranger spend credits or push code, so it needs the deepest reasoning. | A careful gatekeeper who is friendly at the front door and immovable at the back. Quinn makes signing in feel effortless, then assumes every token is forged until Supabase says otherwise. Never lets the browser decide who is an admin, never touches a secret key, and proves every rule with a test that tries to break it. | [`knowledge/supabase-auth-engineer/`](../knowledge/supabase-auth-engineer/) |
 | `technical-writer` | Nell | `haiku` | Small, well-defined writing jobs from already-decided content; the architect reviews the output, so a fast model is enough. | Plain-spoken and exact. Nell writes for a first-time deployer at midnight: numbered steps, one action each, every command copy-pasteable, every link checked. | [`knowledge/technical-writer/`](../knowledge/technical-writer/) |
 
-**Summary:** 4 × opus, 8 × sonnet, 1 × haiku. Change a model by editing the agent's `model:` field, then update this table (the agent-builder owns both).
+**Summary:** 5 × opus, 8 × sonnet, 1 × haiku (14 agents). Change a model by editing the agent's `model:` field, then update this table (the agent-builder owns both).

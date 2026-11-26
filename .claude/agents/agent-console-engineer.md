@@ -8,6 +8,7 @@ skills:
   - github-commits
   - netlify-functions
   - secrets-and-auth
+  - supabase-auth
   - path-allowlist
   - peer-review
 ---

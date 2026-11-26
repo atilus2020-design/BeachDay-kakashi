@@ -7,6 +7,7 @@ skills:
   - netlify-functions
   - netlify-deploy-config
   - secrets-and-auth
+  - supabase-auth
   - pwa-installability
   - peer-review
 ---

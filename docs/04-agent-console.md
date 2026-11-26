@@ -1,6 +1,6 @@
 # 4. Agent Console: design, security and long jobs
 
-A password-protected page inside the deployed app (`/console`) that:
+A sign-in-protected page inside the deployed app (`/console`), open only to users whose `profiles.role` is `super_admin` (Supabase Auth; see `docs/security.md`), that:
 
 1. **Lists every agent** in `.claude/agents/` with its name, model and personality.
 2. **Lets the user chat with any agent.** Claude is called **only from a Netlify Function**, with the key in an environment variable.
@@ -45,17 +45,18 @@ All four have a 1M-token context window and 128K max output.
 
 ## 4.2 Endpoints
 
+Sign up, log in, log out, forgot password and Continue with Google happen **in the browser with supabase-js against Supabase Auth**; there are no `/api/auth/*` Functions. Every endpoint below runs the guard in `docs/security.md` §5: the Supabase access token arrives as `Authorization: Bearer`, is verified server-side, and the role is read from `public.profiles` under RLS. "CSRF" means `X-Requested-With: beachday` plus the `Origin` / `Sec-Fetch-Site` check (security.md R10).
+
 | Method and path | Function | Auth | Purpose |
 |---|---|---|---|
-| `POST /api/auth/login` | auth | password | Verify the password, set the session cookie |
-| `POST /api/auth/logout` | auth | session | Clear the cookie |
-| `GET /api/agents` | agents | session | Public agent list (or serve `/agents.json` behind the gate) |
-| `POST /api/agent/chat` | agent-chat (streaming) | session | One chat turn, streamed as server-sent events (SSE) |
-| `POST /api/jobs` | agent-job (background) | session | Start a long task, such as "implement X and propose a change" |
-| `GET /api/jobs/:id` | job-status | session | Poll status, progress events and the proposal ID |
-| `GET /api/proposals` and `/:id` | proposals | session | List or view pending proposals with their diff |
-| `POST /api/proposals/:id/approve` | approve | session + CSRF + re-check | Commit to GitHub |
-| `POST /api/proposals/:id/reject` | proposals | session | Mark the proposal rejected |
+| ~~`POST /api/auth/login`, `POST /api/auth/logout`~~ | — | — | **Removed** (superseded by Supabase Auth in the browser) |
+| `GET /api/agents` | agents | Supabase token + super_admin | Agent list |
+| `POST /api/agent/chat` | agent-chat (streaming) | Supabase token + super_admin + CSRF | One chat turn, streamed as server-sent events (SSE) |
+| `POST /api/jobs` | jobs (synchronous) → agent-job (background) | Supabase token + super_admin + CSRF | Start a long task, such as "implement X and propose a change" |
+| `GET /api/jobs/:id` | job-status | Supabase token + super_admin | Poll status, progress events and the proposal ID |
+| `GET /api/proposals` and `/:id` | proposals | Supabase token + super_admin | List or view pending proposals with their diff |
+| `POST /api/proposals/:id/approve` | approve | Supabase token + super_admin + CSRF + allow-list re-check | Commit to GitHub |
+| `POST /api/proposals/:id/reject` | proposals | Supabase token + super_admin + CSRF | Mark the proposal rejected |
 
 ## 4.3 Chat: calling Claude from a function
 
@@ -79,18 +80,20 @@ Facts from the Claude API docs:
 // netlify/functions/agent-chat.mts (sketch)
 import Anthropic from "@anthropic-ai/sdk";
 import type { Config, Context } from "@netlify/functions";
-import { requireSession } from "./_lib/session.ts";
+import { guard } from "./_lib/auth.ts";              // docs/security.md §5
 import { getAgent } from "./_lib/agents.ts";          // server-side prompts and model IDs
 import { checkBudget, recordUsage } from "./_lib/budget.ts";
 
 const client = new Anthropic();                        // reads ANTHROPIC_API_KEY from env
 
 export default async (req: Request, ctx: Context) => {
-  const session = await requireSession(req, ctx);      // 401 if missing or invalid
+  const g = await guard(req);                          // Supabase token + super_admin; 401/403 otherwise
+  if (!g.ok) return g.response;
+  const user = g.user;                                 // { id, email } from Supabase, never from the body
   const { agent: agentName, messages } = await req.json();
   const agent = getAgent(agentName);                   // 404 if unknown; never trust a client system prompt
   validateMessages(messages);                          // roles user/assistant only, size caps, ≤ N turns
-  await checkBudget(session, ctx.ip);                  // daily request/token budget in Blobs (strong)
+  await checkBudget(user.id, ctx.ip);                  // daily request/token budget in Blobs (strong)
 
   const enc = new TextEncoder();
   const body = new ReadableStream({
@@ -109,7 +112,7 @@ export default async (req: Request, ctx: Context) => {
         });
         stream.on("text", (t) => send("text", t));
         const final = await stream.finalMessage();
-        await recordUsage(session, final.usage);
+        await recordUsage(user.id, final.usage);
         send("done", { stop_reason: final.stop_reason });
       } catch (err) {
         send("error", { message: "Agent unavailable, please retry." }); // no stack traces to the client
@@ -193,30 +196,31 @@ Also give the agent **read-only tools** so it proposes changes against real code
 
 ## 4.5 Security model
 
+> **`docs/security.md` is the authoritative security model** (threats, rules R1–R17, environment variables, the guard contract and the QA checklist). This section is a summary; where they differ, `docs/security.md` wins.
+
 ### 4.5.1 Threats to design for
 
 | Threat | Mitigation |
 |---|---|
-| Strangers using the console to burn Claude credits | Password gate, session cookie, per-IP rate limits, daily budget, Anthropic spend limit |
-| Strangers getting the app to commit code | Every write endpoint requires a session. Approve also requires a CSRF check and an approval-specific confirmation |
+| Strangers or ordinary signed-up users using the console to burn Claude credits | Supabase token verified server-side on every request, role `super_admin` read from `profiles` under RLS, per-IP rate limits, daily budget, Anthropic spend limit |
+| Strangers getting the app to commit code | Every endpoint requires a verified Supabase token and `super_admin`. Approve also requires the CSRF checks and an approval-specific confirmation |
+| A user making themselves `super_admin` | No UPDATE privilege or policy on `profiles`; role assigned only by the owner in the SQL editor; role never taken from the client or JWT claims (security.md R2–R4) |
 | **Prompt injection** (a malicious file, issue text or chat message steers an agent into a harmful change) | The agent can only *propose*. The server validates paths and the human reviews the full diff. Agents can't edit security code (deny-list). Tool outputs are treated as untrusted data in the system prompt |
 | A leaked GitHub token | Fine-grained token for this repository only, Contents read/write only, with an expiry. It is only in the Functions environment and never logged |
 | A leaked Claude key | Only in the Functions environment; separate workspace with a spend limit; rotate it |
 | An agent changing CI or deploy config to escape | The token lacks the Workflows permission, so GitHub rejects `.github/workflows` changes. The allow-list also blocks `netlify.toml`, `netlify/functions/**`, `package*.json`, `.claude/**` and `.github/**` |
 | Approving a stale proposal over newer commits | Compare the base SHA; on mismatch, rebase or re-propose (§4.6) |
 
-### 4.5.2 Password gate and sessions
+### 4.5.2 Sign-in and roles (Supabase Auth)
 
-- **Store a hash, not a password.** `CONSOLE_PASSWORD_HASH` holds an scrypt hash generated offline (Node `crypto.scrypt` with a random salt, stored as `salt:hash`). Verify with `crypto.timingSafeEqual`.
-- **Session:** on a successful login, set a cookie `bd_session = base64url(payload).HMAC_SHA256(payload, SESSION_SECRET)` with `payload = { sub: "owner", iat, exp: iat + 8h }`.
-  - Cookie flags: `HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=28800`.
-  - Set and read it with `context.cookies`.
-  - Rotate `SESSION_SECRET` to log everyone out.
-- **Brute force:** `rateLimit` on `/api/auth/login` (for example 5 per 60 s per IP), plus a failure counter in Blobs (`login-fail/<ip>`, strong consistency) that locks the IP out for 15 minutes after 10 failures.
-- **CSRF:** `SameSite=Strict` already blocks cross-site cookie sending. Also require an `X-Requested-With: beachday` header on every POST and check that `Origin` matches the site URL (`context.site.url`).
-- **Approve is high-impact.** Show the full diff and require an explicit "Approve and deploy" click, with the proposal title typed or confirmed. Optionally ask for the password again on approve.
-- **Single owner** at first. If more users are needed later, use Netlify Identity or an OAuth provider instead of a shared password.
-- **The page is static** and contains no secrets. The gate only protects the *APIs*, and that is where protection matters. Still, mark `/console` `noindex` and `no-store`.
+> **Superseded:** the original shared-password gate (`CONSOLE_PASSWORD_HASH`, HMAC `bd_session` cookie with `SESSION_SECRET`, `/api/auth/login`) is replaced by Supabase Auth. Do not build it.
+
+- **Sign-in** is Supabase Auth in the browser: email and password (sign up with email confirmation, log in, log out, forgot password) and Continue with Google (`signInWithOAuth({ provider: 'google' })`). The browser client uses only `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY`.
+- **Roles** live in `public.profiles` (`role` default `'user'`), created by a trigger on `auth.users`. RLS lets a user read only their own row; nobody can update `role` through the API. The owner assigns `super_admin` by hand in the Supabase SQL editor.
+- **Every Function** verifies the access token with Supabase (`auth.getUser(jwt)`) and reads the role with the caller's JWT, on every request. Only `super_admin` passes. The secret / `service_role` key is never used.
+- **Approve is high-impact.** Show the full diff and require an explicit "Approve and deploy" click, with the proposal title typed or confirmed.
+- **The page is static** and contains no secrets; hiding the Agents link from non-admins is cosmetic. Mark `/console` `noindex` and `no-store`.
+- Full rules, SQL, redirect allow-list and Google client settings: `docs/security.md`.
 
 ### 4.5.3 GitHub fine-grained personal access token
 
@@ -263,24 +267,24 @@ export function assertWritablePath(p: string): string {
 
 ### 4.5.5 No secrets in the browser
 
-- Only Functions read `ANTHROPIC_API_KEY`, `GITHUB_TOKEN`, `SESSION_SECRET`, `CONSOLE_PASSWORD_HASH` and `GITHUB_REPO`.
-- Never use a `VITE_` or `PUBLIC_` prefix for these. A build-time check should fail if any of these names appear in `dist/`.
+- Only Functions read `ANTHROPIC_API_KEY`, `GITHUB_TOKEN`, `JOB_SIGNING_SECRET` and `GITHUB_REPO`. The only browser-visible values are `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY`, which are public by design (safe only because RLS is on for every table).
+- Never use a `VITE_` or `PUBLIC_` prefix for these. A build-time check fails if any of these names, or `sk-ant-`, `github_pat_`, `sb_secret_` or `service_role`, appear in `dist/` (security.md R7).
 - Never return upstream error bodies to the client verbatim (they can echo headers). Log a redacted version instead.
-- CSP `connect-src 'self'` (doc 3 §3.5) means the client can only talk to our own functions.
+- CSP `connect-src 'self' https://<project-ref>.supabase.co` (doc 3 §3.5 needs updating) means the client can only talk to our own functions and our Supabase project.
 
 ### 4.5.6 Rate limits and budgets (defence in depth)
 
 | Layer | Setting |
 |---|---|
-| Netlify `rateLimit` (per IP, edge-enforced) | login 5/60 s; chat 10/60 s; jobs 3/60 s; approve 5/60 s |
-| App budget (Blobs, strong) | For example 200 chat turns and 20 jobs a day, plus a daily token ceiling summed from `usage` |
+| Netlify `rateLimit` (per IP, edge-enforced) | chat 10/60 s; jobs 3/60 s; approve 5/60 s; reads 60/60 s. Sign-in limits are Supabase Auth's built-in rate limits |
+| App budget (Blobs, strong) | Per user `id` and global: for example 200 chat turns and 20 jobs a day, plus a daily token ceiling summed from `usage` |
 | Claude Console | Workspace **spend limit**; a separate key for this app |
 | Claude 429 | Respect `retry-after`; show "busy, retry in N s" |
 | GitHub | Commits are rare; still serialize approvals (one at a time, via a strong-consistency lock key in Blobs) |
 
 ### 4.5.7 Audit log
 
-Append an audit entry to Blobs for each login, failed login, chat turn (agent, tokens), job, proposal, approval and rejection, with time, IP and request ID. Show the last 50 on a Console "Activity" tab.
+Append an audit entry to Blobs for each chat turn (agent, tokens), job, proposal, approval, rejection and denied request (401/403/429), with time, Supabase user `id`, IP and request ID, never tokens. Sign-ins and password resets are in the Supabase Auth logs. Show the last 50 on a Console "Activity" tab.
 
 ## 4.6 Approve → commit → redeploy
 
@@ -311,7 +315,7 @@ Append an audit entry to Blobs for each login, failed login, chat turn (agent, t
 
 ### Background job flow
 
-1. `POST /api/jobs` (a normal synchronous function) checks the session, budget and input, then creates `job/<id>` with `status: "queued"` (`onlyIfNew`). It then calls the background function's URL internally, with the job ID and an **internal HMAC signature** (`JOB_SIGNING_SECRET`), so strangers can't start background work directly. It returns `{ jobId }`.
+1. `POST /api/jobs` (a normal synchronous function) runs the guard (Supabase token + super_admin), then checks budget and input, then creates `job/<id>` with `status: "queued"` (`onlyIfNew`). It then calls the background function's URL internally, with the job ID and an **internal HMAC signature** (`JOB_SIGNING_SECRET`), so strangers can't start background work directly. It returns `{ jobId }`.
 2. **`agent-job` (`config.background = true`)** receives the call; the caller has already received an empty 202. It then:
    - verifies the signature;
    - **claims** the job with a compare-and-swap from `queued` to `running` (`onlyIfMatch`), so the platform's retry after a failure (1 minute, then 2 minutes) doesn't run it twice;
@@ -329,7 +333,7 @@ Append an audit entry to Blobs for each login, failed login, chat turn (agent, t
 
 ## 4.8 Console UI outline
 
-- **Login** with a password field and an error message; no username.
+- **Sign in** (Supabase Auth): email and password, Continue with Google, Sign up, Forgot password; Log out in the header. Non-admins see a "Not allowed" state, never the Agents page.
 - **Agents** grid, showing each card's name, model badge (Opus / Sonnet / Haiku), personality excerpt, "Chat" button and "Give a task" button.
 - **Chat** with a message list, composer and stop button. Tool calls are shown as collapsible "📄 read src/app/today.ts" rows.
 - **Jobs** with a live activity feed per job.
@@ -343,14 +347,18 @@ Append an audit entry to Blobs for each login, failed login, chat turn (agent, t
 | `ANTHROPIC_API_KEY` | Functions; all contexts (a separate low-limit key for previews and dev) | Claude API |
 | `GITHUB_TOKEN` | Functions; **Production only** | Fine-grained token for this repository |
 | `GITHUB_REPO` | Functions | `owner/name`, hard-coded target |
-| `CONSOLE_PASSWORD_HASH` | Functions | scrypt `salt:hash` |
-| `SESSION_SECRET` | Functions | HMAC key for session cookies (32+ random bytes) |
+| `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY` | Builds (inlined into the bundle) | Public. Browser Supabase client |
+| `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY` | Functions | Public. Token verification and role lookup with the caller's JWT |
 | `JOB_SIGNING_SECRET` | Functions | HMAC key for internal background invocations |
-| `DAILY_CHAT_LIMIT`, `DAILY_JOB_LIMIT` | Functions | Budget knobs |
+| `DAILY_CHAT_LIMIT`, `DAILY_JOB_LIMIT`, `DAILY_TOKEN_LIMIT` | Functions | Budget knobs |
+| ~~`CONSOLE_PASSWORD_HASH`, `SESSION_SECRET`~~ | — | **Retired** with the password gate |
+
+Never set `SUPABASE_SECRET_KEY` or `SUPABASE_SERVICE_ROLE_KEY`. The full table with secret/public classification is in `docs/security.md` §4.
 
 ## 4.10 Open questions
 
 - **Decided (D-003):** commit directly to `main`.
 - **Decided (D-005):** a fine-grained personal access token for this repository only, with Contents read/write and Metadata read.
 - Should agents get a `run_tests` tool? Not inside Netlify Functions: there is no repository checkout or toolchain. If wanted, have the approve step open a pull request and let GitHub Actions run tests. That needs a separate, human-managed workflow, not one written by agents.
-- Single owner vs several users? Single owner is enough for now; use Netlify Identity or OAuth if that changes.
+- **Decided (lead, 2026-11-26; decision record pending):** Supabase Auth (email and password plus Google) with roles in `public.profiles`; only `super_admin` uses the Console. See `docs/security.md`.
+- MFA for the `super_admin` account: recommended, not yet decided.

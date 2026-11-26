@@ -14,6 +14,7 @@ Every agent's file has a **"Before you answer"** section: read every file here f
 | pwa-mobile-engineer | MDN PWA guides, web.dev install criteria and offline cookbook, WebKit blog | `check-manifest.mjs`, `sw.js` (syntax-checked) |
 | netlify-engineer | Netlify docs: functions, limits, rate limiting, env vars, Blobs, headers, deploys | `hello-function.mjs`, `netlify.toml` (parsed) |
 | qa-engineer | Playwright docs: emulation, mocking, web server, accessibility | `mobile-and-mock.spec.mjs` (Chromium, iPhone 13 + Pixel 7 profiles) |
+| supabase-auth-engineer | Supabase docs: password auth, supabase-js auth reference, JWTs, Login with Google, redirect URLs, RLS, column privileges, API keys, profiles trigger | `test-schema.mjs` (schema.sql in PGlite, 12 checks), `verify-token.mjs` (401/401/403/200 against a mock), `browser-auth.js` (syntax-checked) |
 | ui-designer-apple-liquid-glass (Sable) | Apple HIG: materials, colour, typography, accessibility | `contrast-check.mjs` over `tokens.css` (16 pairs ≥ 4.5:1) |
 | ux-designer-apple-hig (Wren) | Apple HIG: layout, writing, accessibility | flow spec and copy deck (Markdown) |
 | frontend-engineer | Vite env and multi-page, MDN textContent | `sse-reader.mjs`, `render-day.mjs` |
@@ -26,4 +27,4 @@ Re-run all runnable examples:
 ```bash
 for f in knowledge/*/examples/*.mjs; do (cd "$(dirname "$f")" && node "$(basename "$f")" >/dev/null && echo "ok $f") || echo "FAIL $f"; done
 ```
-(Run `npm install` in `knowledge/agent-console-engineer/examples` first. `validate-team.mjs` must run from the repo root.)
+(Run `npm install` in `knowledge/agent-console-engineer/examples` and `knowledge/supabase-auth-engineer/examples` first. `validate-team.mjs` must run from the repo root.)

@@ -26,6 +26,7 @@
 |---|---|---|---|
 | 12 | `frontend-engineer` | Implements the screens in vanilla TypeScript + Vite from Sable's tokens and Wren's flows, and wires them to the Functions. | Designers specify and engineers own platforms, but somebody has to write the UI code. Without this role the designers would be coding or the integrator would be building screens. |
 | 13 | `technical-writer` | Writes the README and deploy steps, the How it works page, the Resources page and the step-by-step `/guide/`. | The app ships three content pages and a deploy guide. Accurate, plain-language docs are a distinct skill, and wrong deploy steps are a common failure. |
+| 14 | `supabase-auth-engineer` (**Quinn**) | Builds sign up, log in, log out, forgot password and Continue with Google on Supabase Auth, the `profiles` table with roles and RLS, and the Function guard that checks the access token and `super_admin` role on every request. | Only `super_admin` may open the Agents page, chat or Approve, so auth is the gate in front of code commits. It is a distinct, error-prone skill (RLS, JWT verification, OAuth redirect set-up) that neither the security engineer (policy and review) nor the Agent Console engineer (Claude and GitHub calls) should absorb. |
 
 **Roles deliberately not added:**
 
@@ -49,15 +50,16 @@ Each skill is a project skill in `.claude/skills/<skill>/SKILL.md`. Each agent l
 | `open-meteo-forecast` | Forecast and marine endpoints, fields, units, time zones, caching, terms | open-meteo-integrator, frontend-engineer, qa-engineer |
 | `beach-scoring` | Beach window, vetoes, weighted components, labels, reasons, NWS link-out | open-meteo-integrator, frontend-engineer, ux-designer-apple-hig, qa-engineer |
 | `pwa-installability` | Manifest, icons, service worker strategies, offline fallback, iOS and Android install UX | pwa-mobile-engineer, frontend-engineer, netlify-engineer, qa-engineer |
-| `vanilla-frontend` | Vite multi-page build, ES modules, small bundles, fetch/stream helpers, no framework | frontend-engineer, pwa-mobile-engineer, ui-designer-apple-liquid-glass |
+| `vanilla-frontend` | Vite multi-page build, ES modules, small bundles, fetch/stream helpers, no framework | frontend-engineer, pwa-mobile-engineer, ui-designer-apple-liquid-glass, supabase-auth-engineer |
 | `apple-hig-ux` | HIG navigation, layout, touch targets, feedback, writing | ux-designer-apple-hig, ui-designer-apple-liquid-glass, frontend-engineer |
 | `liquid-glass-ui` | Translucent materials, depth, tokens, typography, dark mode, legibility over glass | ui-designer-apple-liquid-glass, frontend-engineer |
 | `accessibility-wcag` | WCAG 2.2 AA rules applied to this app (contrast, targets, live regions, reduced motion) | ux-designer-apple-hig, ui-designer-apple-liquid-glass, frontend-engineer, pwa-mobile-engineer, qa-engineer |
-| `netlify-functions` | Modern Function syntax, 60 s / 15 min limits, streaming, background functions, `rateLimit`, Blobs | netlify-engineer, agent-console-engineer, open-meteo-integrator, security-engineer, software-architect |
+| `netlify-functions` | Modern Function syntax, 60 s / 15 min limits, streaming, background functions, `rateLimit`, Blobs | netlify-engineer, supabase-auth-engineer, agent-console-engineer, open-meteo-integrator, security-engineer, software-architect |
 | `netlify-deploy-config` | `netlify.toml`, build, headers and CSP, environment variables per context, Free plan limits, Git deploys | netlify-engineer, software-architect, technical-writer, orchestrator |
 | `claude-api` | Messages API, model IDs, streaming, tool use, refusals, rate limits, cost | agent-console-engineer, agent-builder, security-engineer |
 | `github-commits` | Fine-grained token, Contents API, Git Data API atomic commits, stale checks | agent-console-engineer, security-engineer, qa-engineer |
-| `secrets-and-auth` | Environment-variable secrets, sessions/tokens, CSRF, login rate limits, no secrets in the browser | security-engineer, agent-console-engineer, netlify-engineer |
+| `secrets-and-auth` | Environment-variable secrets, sessions/tokens, CSRF, login rate limits, no secrets in the browser | security-engineer, agent-console-engineer, netlify-engineer, supabase-auth-engineer |
+| `supabase-auth` | Email+password and Google sign-in, `profiles` + RLS + role protection, Bearer token verification with the publishable key, dashboard and Google console set-up | supabase-auth-engineer, security-engineer, agent-console-engineer, frontend-engineer, netlify-engineer |
 | `path-allowlist` | Write allow/deny lists, path normalization, size caps, the fuzz tests that prove them | security-engineer, agent-console-engineer, qa-engineer |
 | `playwright-e2e` | Playwright projects for phones, offline tests, network mocking, axe checks | qa-engineer, frontend-engineer, pwa-mobile-engineer |
 | `docs-writing` | Plain-language docs, deploy READMEs, link hygiene, the Resources page | technical-writer, software-architect, orchestrator |
@@ -71,14 +73,15 @@ Each skill is a project skill in `.claude/skills/<skill>/SKILL.md`. Each agent l
 | software-architect | architecture-decisions, netlify-functions, netlify-deploy-config, docs-writing, peer-review |
 | open-meteo-integrator | open-meteo-forecast, beach-scoring, netlify-functions, peer-review |
 | pwa-mobile-engineer | pwa-installability, vanilla-frontend, accessibility-wcag, playwright-e2e, peer-review |
-| security-engineer | secrets-and-auth, path-allowlist, github-commits, claude-api, netlify-functions, peer-review |
-| agent-console-engineer | claude-api, github-commits, netlify-functions, secrets-and-auth, path-allowlist, peer-review |
+| security-engineer | secrets-and-auth, supabase-auth, path-allowlist, github-commits, claude-api, netlify-functions, peer-review |
+| agent-console-engineer | claude-api, github-commits, netlify-functions, secrets-and-auth, supabase-auth, path-allowlist, peer-review |
 | ui-designer-apple-liquid-glass | liquid-glass-ui, apple-hig-ux, accessibility-wcag, vanilla-frontend, peer-review |
 | ux-designer-apple-hig | apple-hig-ux, accessibility-wcag, beach-scoring, peer-review |
 | qa-engineer | playwright-e2e, accessibility-wcag, beach-scoring, open-meteo-forecast, pwa-installability, github-commits, path-allowlist, peer-review |
-| netlify-engineer | netlify-functions, netlify-deploy-config, secrets-and-auth, pwa-installability, peer-review |
-| frontend-engineer | vanilla-frontend, apple-hig-ux, liquid-glass-ui, accessibility-wcag, pwa-installability, open-meteo-forecast, beach-scoring, playwright-e2e, peer-review |
+| netlify-engineer | netlify-functions, netlify-deploy-config, secrets-and-auth, supabase-auth, pwa-installability, peer-review |
+| frontend-engineer | vanilla-frontend, supabase-auth, apple-hig-ux, liquid-glass-ui, accessibility-wcag, pwa-installability, open-meteo-forecast, beach-scoring, playwright-e2e, peer-review |
 | technical-writer | docs-writing, architecture-decisions, netlify-deploy-config, peer-review |
+| supabase-auth-engineer | supabase-auth, secrets-and-auth, netlify-functions, vanilla-frontend, peer-review |
 
 ## How the team works
 
@@ -93,7 +96,8 @@ Each skill is a project skill in `.claude/skills/<skill>/SKILL.md`. Each agent l
 | `docs/decisions.md`, `docs/build-plan.md`, folder layout | software-architect | orchestrator |
 | `src/scoring/**`, `src/data/beaches.json`, `netlify/functions/forecast.mts` | open-meteo-integrator | qa-engineer |
 | `public/manifest.webmanifest`, `public/icons/**`, `src/sw.*`, offline page | pwa-mobile-engineer | qa-engineer, frontend-engineer |
-| `netlify/functions/_lib/{session,allowlist,auth}.*`, security headers | security-engineer | agent-console-engineer |
+| `netlify/functions/_lib/{session,allowlist,csrf,ratelimit}.*`, security headers | security-engineer | agent-console-engineer |
+| `src/lib/auth.*`, `login/` page logic, `supabase/migrations/**`, `netlify/functions/_lib/auth.*` (token + role guard) | supabase-auth-engineer | security-engineer |
 | `netlify/functions/{agents,agent-chat,proposals,approve}.*`, `netlify/functions/_lib/{claude,github}.*`, `scripts/build-agents.*` | agent-console-engineer | security-engineer |
 | `src/styles/**` (tokens, materials) | ui-designer-apple-liquid-glass | ux-designer-apple-hig |
 | Flow specs, copy (`docs/ux/**`) | ux-designer-apple-hig | ui-designer-apple-liquid-glass |

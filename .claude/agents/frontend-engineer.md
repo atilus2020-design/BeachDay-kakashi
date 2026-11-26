@@ -5,6 +5,7 @@ model: sonnet
 color: orange
 skills:
   - vanilla-frontend
+  - supabase-auth
   - apple-hig-ux
   - liquid-glass-ui
   - accessibility-wcag

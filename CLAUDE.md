@@ -22,6 +22,7 @@ The experts are project subagents in `.claude/agents/`. Their skills are in `.cl
 | `pwa-mobile-engineer` | Juno | Manifest, service worker, offline, install on iOS and Android |
 | `security-engineer` | Rook | Auth, secrets, allow-list, rate limits; reviews all security-relevant work |
 | `agent-console-engineer` | Ada | Claude chat and GitHub commits from Netlify Functions |
+| `supabase-auth-engineer` | Quinn | Supabase Auth (email+password, Google), `profiles` roles and RLS, the token and `super_admin` check in every Function |
 | `ui-designer-apple-liquid-glass` | Sable | Visual design: Liquid Glass tokens, type, colour, dark mode |
 | `ux-designer-apple-hig` | Wren | Flows, navigation, copy, states (Apple HIG) |
 | `qa-engineer` | Pike | Unit, function and Playwright tests, accessibility checks |

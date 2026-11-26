@@ -1,0 +1,76 @@
+/* Beach Day design tokens (original Apple-inspired Liquid Glass). Light + dark.
+   Every text/background pair is verified by the contrast check (see docs/ux/visual.md). */
+:root {
+  color-scheme: light dark;
+
+  /* surfaces + text */
+  --bg: #eef6fb;           --surface: #ffffff;       --surface-2: #e4f0f8;
+  --text: #0b2233;         --text-2: #3d5566;
+  --line: #8fa6b6;         /* UI parts / borders, >= 3:1 on surface */
+  --line-soft: rgba(11, 34, 51, 0.12);
+
+  /* accent + status */
+  --accent: #0a6aa6;       --on-accent: #ffffff;
+  --danger: #b3261e;       --on-danger: #ffffff;
+  --score-great: #0f7b3f;  --score-good: #2f6f00;    --score-fair: #8a5a00;   --score-poor: #b3261e;
+  --score-great-bg: #e3f4ea; --score-good-bg: #eef5de; --score-fair-bg: #fbf0d9; --score-poor-bg: #fbe6e4;
+
+  /* banners (text uses --text on these) */
+  --banner-info-bg: #dcecf8;  --banner-stale-bg: #fbf0d9;
+  --banner-offline-bg: #e6e9ee; --banner-error-bg: #fbe6e4;
+
+  /* diff */
+  --diff-add-bg: #e3f4ea;  --diff-del-bg: #fbe6e4;   --diff-add-text: #0b5a2d; --diff-del-text: #8c1d17;
+
+  /* glass */
+  --glass-tint: rgba(255, 255, 255, 0.62);  --glass-border: rgba(255, 255, 255, 0.7);
+  --glass-highlight: rgba(255, 255, 255, 0.8);
+  --scrim: rgba(7, 24, 35, 0.4);
+  --shadow-1: 0 1px 2px rgba(11, 34, 51, 0.08), 0 4px 14px rgba(11, 34, 51, 0.08);
+  --shadow-2: 0 8px 32px rgba(11, 34, 51, 0.16);
+  --focus-ring: #0a5a8e;   /* >= 3:1 on bg and surface */
+
+  /* shape + spacing (4-pt grid) */
+  --radius-s: 12px; --radius-m: 20px; --radius-l: 28px; --radius-pill: 999px;
+  --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px; --space-5: 20px;
+  --space-6: 24px; --space-8: 32px; --space-10: 40px; --space-12: 48px;
+  --tap: 44px;
+  --content-w: 720px;      --content-w-wide: 1080px;
+  --gutter: 16px;
+
+  /* type */
+  --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, "Segoe UI", Roboto, sans-serif;
+  --font-round: ui-rounded, "SF Pro Rounded", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --text-s: 0.875rem; --text-m: 1.0625rem; --text-l: 1.25rem; --text-xl: 1.625rem;
+  --text-score: clamp(4rem, 22vw, 6rem);
+
+  /* motion */
+  --dur-fast: 120ms; --dur: 220ms; --dur-slow: 400ms;
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+
+  /* safe areas */
+  --safe-top: env(safe-area-inset-top, 0px);       --safe-right: env(safe-area-inset-right, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px); --safe-left: env(safe-area-inset-left, 0px);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #071823;         --surface: #10283a;       --surface-2: #17354b;
+    --text: #eaf4fb;       --text-2: #a9c1d2;
+    --line: #6f8da3;       --line-soft: rgba(234, 244, 251, 0.14);
+    --accent: #5cb8f0;     --on-accent: #04121c;
+    --danger: #ff8a80;     --on-danger: #2a0805;
+    --score-great: #5fd68f; --score-good: #a6d96a;   --score-fair: #f2c14e;  --score-poor: #ff8a80;
+    --score-great-bg: #123a27; --score-good-bg: #2a3a14; --score-fair-bg: #3d3010; --score-poor-bg: #44201d;
+    --banner-info-bg: #12405c;  --banner-stale-bg: #3d3010;
+    --banner-offline-bg: #263341; --banner-error-bg: #44201d;
+    --diff-add-bg: #123a27; --diff-del-bg: #44201d;  --diff-add-text: #8ee6b0; --diff-del-text: #ffb4ac;
+    --glass-tint: rgba(16, 40, 58, 0.62);  --glass-border: rgba(255, 255, 255, 0.14);
+    --glass-highlight: rgba(255, 255, 255, 0.16);
+    --scrim: rgba(0, 0, 0, 0.55);
+    --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4), 0 4px 14px rgba(0, 0, 0, 0.3);
+    --shadow-2: 0 8px 32px rgba(0, 0, 0, 0.5);
+    --focus-ring: #8fd0f7;
+  }
+}

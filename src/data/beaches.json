@@ -1,0 +1,112 @@
+[
+  {
+    "id": "south-beach",
+    "name": "South Beach",
+    "city": "Miami Beach",
+    "county": "Miami-Dade",
+    "lat": 25.7826,
+    "lon": -80.13,
+    "coast": "atlantic",
+    "nwsOffice": "MFL",
+    "nwsUrl": "https://forecast.weather.gov/product.php?site=MFL&issuedby=MFL&product=SRF"
+  },
+  {
+    "id": "crandon",
+    "name": "Crandon Park",
+    "city": "Key Biscayne",
+    "county": "Miami-Dade",
+    "lat": 25.718,
+    "lon": -80.154,
+    "coast": "atlantic",
+    "nwsOffice": "MFL",
+    "nwsUrl": "https://forecast.weather.gov/product.php?site=MFL&issuedby=MFL&product=SRF"
+  },
+  {
+    "id": "haulover",
+    "name": "Haulover Beach",
+    "city": "Miami",
+    "county": "Miami-Dade",
+    "lat": 25.903,
+    "lon": -80.1205,
+    "coast": "atlantic",
+    "nwsOffice": "MFL",
+    "nwsUrl": "https://forecast.weather.gov/product.php?site=MFL&issuedby=MFL&product=SRF"
+  },
+  {
+    "id": "hollywood",
+    "name": "Hollywood Beach",
+    "city": "Hollywood",
+    "county": "Broward",
+    "lat": 26.0112,
+    "lon": -80.1173,
+    "coast": "atlantic",
+    "nwsOffice": "MFL",
+    "nwsUrl": "https://forecast.weather.gov/product.php?site=MFL&issuedby=MFL&product=SRF"
+  },
+  {
+    "id": "fort-lauderdale",
+    "name": "Fort Lauderdale Beach",
+    "city": "Fort Lauderdale",
+    "county": "Broward",
+    "lat": 26.1189,
+    "lon": -80.1037,
+    "coast": "atlantic",
+    "nwsOffice": "MFL",
+    "nwsUrl": "https://forecast.weather.gov/product.php?site=MFL&issuedby=MFL&product=SRF"
+  },
+  {
+    "id": "deerfield",
+    "name": "Deerfield Beach",
+    "city": "Deerfield Beach",
+    "county": "Broward",
+    "lat": 26.3184,
+    "lon": -80.0748,
+    "coast": "atlantic",
+    "nwsOffice": "MFL",
+    "nwsUrl": "https://forecast.weather.gov/product.php?site=MFL&issuedby=MFL&product=SRF"
+  },
+  {
+    "id": "boca-raton",
+    "name": "Boca Raton (Red Reef / Spanish River)",
+    "city": "Boca Raton",
+    "county": "Palm Beach",
+    "lat": 26.3683,
+    "lon": -80.0687,
+    "coast": "atlantic",
+    "nwsOffice": "MFL",
+    "nwsUrl": "https://forecast.weather.gov/product.php?site=MFL&issuedby=MFL&product=SRF"
+  },
+  {
+    "id": "delray",
+    "name": "Delray Beach",
+    "city": "Delray Beach",
+    "county": "Palm Beach",
+    "lat": 26.4615,
+    "lon": -80.0587,
+    "coast": "atlantic",
+    "nwsOffice": "MFL",
+    "nwsUrl": "https://forecast.weather.gov/product.php?site=MFL&issuedby=MFL&product=SRF"
+  },
+  {
+    "id": "palm-beach",
+    "name": "Palm Beach (Midtown)",
+    "city": "Palm Beach",
+    "county": "Palm Beach",
+    "lat": 26.7056,
+    "lon": -80.0364,
+    "coast": "atlantic",
+    "nwsOffice": "MFL",
+    "nwsUrl": "https://forecast.weather.gov/product.php?site=MFL&issuedby=MFL&product=SRF"
+  },
+  {
+    "id": "jupiter",
+    "name": "Jupiter Beach",
+    "city": "Jupiter",
+    "county": "Palm Beach",
+    "lat": 26.9342,
+    "lon": -80.0705,
+    "coast": "atlantic",
+    "nwsOffice": "MLB",
+    "nwsUrl": "https://forecast.weather.gov/product.php?site=MLB&issuedby=MLB&product=SRF"
+  }
+]

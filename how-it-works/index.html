@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>How Beach Day works</title>
+  <meta name="description" content="How Beach Day turns a model forecast into a beach score, what the score does not cover, where its data comes from, and how agents propose changes.">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <meta name="theme-color" content="#0b3d5c">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon-180.png">
+  <link rel="icon" href="/icons/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/src/styles/base.css">
+</head>
+<body>
+  <header class="site-header" data-shell></header>
+  <noscript>
+    <nav class="site-nav" aria-label="Site">
+      <a href="/">Beach Day</a>
+      <a href="/agents/">Agents</a>
+      <a href="/how-it-works/">How it works</a>
+      <a href="/resources/">Resources</a>
+    </nav>
+  </noscript>
+
+  <main class="page content">
+    <h1>How Beach Day works</h1>
+    <p>Beach Day answers one question: is it a good day to go to the beach? You pick a South Florida beach, and it shows today's score, the best window of the day, the reasons behind the score, and the week ahead.</p>
+    <p>Beach Day is a planning aid based on model forecasts. It is not a safety service. Always follow lifeguard flags and official National Weather Service (NWS) warnings.</p>
+
+    <h2>The beach window</h2>
+    <p>The score looks only at the hours you would actually be on the sand: 9 am to 5 pm local time, limited to the hour after sunrise and the hour before sunset. The app also finds the best three-hour block in that window, so you can see that a morning is better than an afternoon when storms are likely after midday.</p>
+
+    <h2>Hard vetoes</h2>
+    <p>Some conditions cap the whole day's score, whatever the other parts say:</p>
+    <ul>
+      <li><strong>Lightning.</strong> A thunderstorm forecast for two or more hours in the window caps the day at 20 and labels it "No-go: lightning". The NWS advice is to go indoors when thunder roars.</li>
+      <li><strong>Rain most of the day.</strong> If half or more of the window hours have rain, or the chance of rain is 70% or higher, the day is capped at 35.</li>
+      <li><strong>Strong wind gusts.</strong> Gusts of 39 mph or more cap the day at 20.</li>
+      <li><strong>Dangerous surf.</strong> Waves of 6 feet or more cap the day at 30.</li>
+      <li><strong>Extreme heat.</strong> A feels-like temperature of 125 °F or more caps the day at 20.</li>
+    </ul>
+
+    <h2>The six parts of the score</h2>
+    <p>Each hour in the window gets a score from 0 to 100 for six parts. Each part has a weight, and the weighted parts add up to the hour's score.</p>
+    <table>
+      <thead>
+        <tr><th scope="col">Part</th><th scope="col">Weight</th><th scope="col">What it looks at</th></tr>
+      </thead>
+      <tbody>
+        <tr><th scope="row">Rain</th><td>30%</td><td>Chance of rain and rain codes in the forecast</td></tr>
+        <tr><th scope="row">Feels-like temperature</th><td>20%</td><td>Heat and humidity. The best range is 78 to 90 °F.</td></tr>
+        <tr><th scope="row">Wind</th><td>15%</td><td>Sustained wind and gusts. Gentle wind scores best.</td></tr>
+        <tr><th scope="row">Waves</th><td>15%</td><td>Offshore wave height. Calm water scores best.</td></tr>
+        <tr><th scope="row">Sky</th><td>10%</td><td>Cloud cover. Mostly clear scores best.</td></tr>
+        <tr><th scope="row">Water temperature</th><td>10%</td><td>Sea surface temperature. Warm water scores best.</td></tr>
+      </tbody>
+    </table>
+    <p>The day score blends the average of the hour scores with the best three-hour block, and then applies any veto cap.</p>
+
+    <h2>Labels</h2>
+    <ul>
+      <li><strong>80 to 100:</strong> Great beach day</li>
+      <li><strong>60 to 79:</strong> Good</li>
+      <li><strong>40 to 59:</strong> Meh</li>
+      <li><strong>0 to 39:</strong> Skip it</li>
+    </ul>
+    <p>Each label has a colour and a text word and icon, so the label still reads without colour.</p>
+
+    <h2>Reasons</h2>
+    <p>Beach Day names the two or three parts that cost the most points, in plain sentences, such as "Thunderstorms likely after 2 pm" or "Breezy: 18 mph winds". If a score looks wrong, the reasons show why.</p>
+
+    <h2>UV advisory</h2>
+    <p>The UV index is shown as a badge with its EPA category and advice, such as "Seek shade near midday". It is not part of the score. High UV usually comes with sunny weather, which is good beach weather, so the score does not penalise it. Sun protection is still important, and in South Florida the UV badge is often high in summer.</p>
+
+    <h2>Forecast confidence</h2>
+    <p>Forecasts are less reliable the further ahead they reach. Days 4 to 7 of the week are marked "lower confidence". The app shows hourly best windows only for today to day 3.</p>
+
+    <h2>Where the data comes from</h2>
+    <p>Weather and marine data come from <a href="https://open-meteo.com/en/docs" rel="noopener">Open-Meteo</a>. The data is licensed under <a href="https://creativecommons.org/licenses/by/4.0/" rel="noopener">CC BY 4.0</a>, so the app credits Open-Meteo.com. The marine data is an offshore estimate. Near the coast it is less accurate, so Beach Day calls it an offshore wave estimate, not a surf report.</p>
+
+    <h2>What Beach Day does not do</h2>
+    <ul>
+      <li><strong>It does not assess rip currents.</strong> Open-Meteo has no rip-current data, and Beach Day does not guess at it. Each day view links to the <a href="https://forecast.weather.gov/product.php?site=MFL&amp;issuedby=MFL&amp;product=SRF" rel="noopener">NWS Miami Surf Zone Forecast</a>. Check today's rip current risk there before you swim.</li>
+      <li><strong>It is not a safety service.</strong> Beach Day does not know which beach flags are flying today. Obey the lifeguard flags and any official warnings.</li>
+      <li><strong>It does not check water quality, sargassum or jellyfish.</strong> Use official local sources for those.</li>
+    </ul>
+
+    <h2>Installing and using offline</h2>
+    <p>Beach Day is a web app. On an iPhone, open it in Safari, tap Share, then Add to Home Screen. On Android, open it in Chrome and choose Install app or Add to Home screen. Once it has loaded, the app keeps the last forecast it fetched, so you can open it offline. The offline copy can be hours old, so check the time on the forecast.</p>
+
+    <h2>The Agents page</h2>
+    <p>Agents are AI helpers that can propose changes to this site. An agent proposes a change, and only the project owner can approve it. When the owner approves, the change is committed to the repository, and Netlify redeploys the site.</p>
+
+    <h2>Read more</h2>
+    <ul>
+      <li><a href="/resources/">Resources</a>: every official link the project relies on.</li>
+      <li><a href="/guide/">Setup and deploy guide</a>: how to run, deploy and configure your own copy.</li>
+    </ul>
+  </main>
+
+  <footer class="site-footer" data-shell></footer>
+  <noscript>
+    <nav class="site-footer-links" aria-label="Footer">
+      <a href="/resources/">Resources</a>
+      <a href="/guide/">Guide</a>
+      <a href="https://github.com/atilus2020-design/BeachDay-kakashi" rel="noopener">GitHub repo</a>
+      <a href="https://mcp-api.netlify.app/" rel="noopener">API directory</a>
+    </nav>
+    <p>Weather data by Open-Meteo.com. A planning aid, not a safety service.</p>
+  </noscript>
+
+  <script type="module" src="/src/pages/content.ts"></script>
+</body>
+</html>

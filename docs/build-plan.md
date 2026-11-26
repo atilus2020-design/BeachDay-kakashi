@@ -103,6 +103,7 @@ export interface AgentSummary {
   modelAlias: "opus" | "sonnet" | "haiku" | "custom";
   personality: string;             // short excerpt, plain text
   color?: string;
+  knowledge: { path: string; title: string }[];   // files under knowledge/<agent>/docs and examples (§9.3)
 }
 
 export interface ChatMessage { role: "user" | "assistant"; content: string }
@@ -124,6 +125,8 @@ export interface Proposal extends ProposalSummary {
 }
 export interface ApiError { error: string }
 ```
+
+The file also exports helper names for the bodies above (`AgentsResponse`, `ProposalsResponse`, `ApproveRequest`/`ApproveResponse`, `RejectRequest`/`RejectResponse`, `CommitRef`) and the §3.4 stream types (`ChatEventMap`, `ChatEventName`, `ChatEvent`). It holds types only; `DayScore` lives in `src/scoring`.
 
 ### 3.4 Chat stream (`POST /api/agent/chat`)
 

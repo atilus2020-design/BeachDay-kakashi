@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Resources</title>
+  <meta name="description" content="The official weather, beach safety, hosting, sign-in and AI sources that Beach Day relies on, with links to the setup guide and the project repository.">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <meta name="theme-color" content="#0b3d5c">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon-180.png">
+  <link rel="icon" href="/icons/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/src/styles/base.css">
+</head>
+<body>
+  <header class="site-header" data-shell></header>
+  <noscript>
+    <nav class="site-nav" aria-label="Site">
+      <a href="/">Beach Day</a>
+      <a href="/agents/">Agents</a>
+      <a href="/how-it-works/">How it works</a>
+      <a href="/resources/">Resources</a>
+    </nav>
+  </noscript>
+
+  <main class="page content">
+    <h1>Resources</h1>
+    <p>These are the official sources Beach Day relies on. For beach safety, use the NWS links and the lifeguard flags. Beach Day is a planning aid, not a safety service.</p>
+
+    <h2>Beach safety (official sources)</h2>
+    <ul>
+      <li><a href="https://forecast.weather.gov/product.php?site=MFL&amp;issuedby=MFL&amp;product=SRF" rel="noopener">NWS Miami Surf Zone Forecast</a>: rip current risk for South Florida.</li>
+      <li><a href="https://www.weather.gov/beach/florida" rel="noopener">NWS beach forecasts for Florida</a>: map of rip current risk by area.</li>
+      <li><a href="https://www.weather.gov/safety/ripcurrent" rel="noopener">NWS rip current safety</a>: what a rip current is and how to get out of one.</li>
+      <li><a href="https://www.weather.gov/safety/lightning-safety-overview" rel="noopener">NWS lightning safety</a>: when to go indoors.</li>
+      <li><a href="https://www.weather.gov/ama/heatindex" rel="noopener">NWS heat index</a>: feels-like temperature categories.</li>
+      <li><a href="https://www.weather.gov/mfl/beaufort" rel="noopener">NWS Miami Beaufort scale</a>: wind strength in plain words.</li>
+      <li><a href="https://www.epa.gov/sunsafety/uv-index-1" rel="noopener">EPA UV Index</a>: what the UV categories mean for sun protection.</li>
+    </ul>
+
+    <h2>Weather and marine data</h2>
+    <ul>
+      <li><a href="https://open-meteo.com/en/docs" rel="noopener">Open-Meteo Forecast API</a>: the weather data behind every score.</li>
+      <li><a href="https://open-meteo.com/en/docs/marine-weather-api" rel="noopener">Open-Meteo Marine API</a>: offshore wave and sea temperature data.</li>
+      <li><a href="https://open-meteo.com/en/terms" rel="noopener">Open-Meteo terms</a>: the data is licensed under CC BY 4.0, which requires attribution.</li>
+      <li><a href="https://creativecommons.org/licenses/by/4.0/" rel="noopener">Creative Commons Attribution 4.0 (CC BY 4.0)</a>: the licence text.</li>
+    </ul>
+
+    <h2>Platform and hosting</h2>
+    <ul>
+      <li><a href="https://docs.netlify.com/build/functions/overview/" rel="noopener">Netlify Functions</a>: the server code that runs on Netlify.</li>
+      <li><a href="https://docs.netlify.com/build/environment-variables/overview/" rel="noopener">Netlify environment variables</a>: setting values per scope and context.</li>
+      <li><a href="https://docs.netlify.com/build/data-and-storage/netlify-blobs/" rel="noopener">Netlify Blobs</a>: the storage for proposals and job records.</li>
+      <li><a href="https://docs.netlify.com/manage/security/secure-access-to-sites/rate-limiting/" rel="noopener">Netlify rate limiting</a>: how request limits protect the functions.</li>
+      <li><a href="https://vite.dev/guide/env-and-mode" rel="noopener">Vite environment variables</a>: how <code>VITE_</code> values reach the browser build.</li>
+    </ul>
+
+    <h2>Sign-in (Supabase)</h2>
+    <ul>
+      <li><a href="https://supabase.com/docs/guides/auth" rel="noopener">Supabase Auth</a>: email and password sign-in.</li>
+      <li><a href="https://supabase.com/docs/guides/auth/social-login/auth-google" rel="noopener">Supabase: sign in with Google</a>: setting up the Google provider.</li>
+      <li><a href="https://supabase.com/docs/guides/database/postgres/row-level-security" rel="noopener">Supabase Row Level Security</a>: how the profiles table limits who can read what.</li>
+      <li><a href="https://supabase.com/docs/guides/getting-started/api-keys" rel="noopener">Supabase API keys</a>: the publishable key Beach Day uses, and why no secret key is used.</li>
+      <li><a href="https://supabase.com/docs/guides/auth/redirect-urls" rel="noopener">Supabase redirect URLs</a>: the exact return addresses to allow.</li>
+    </ul>
+
+    <h2>AI and code</h2>
+    <ul>
+      <li><a href="https://platform.claude.com/docs/en/about-claude/models/overview" rel="noopener">Claude models</a>: the models the agents run on.</li>
+      <li><a href="https://platform.claude.com/docs/en/api/messages/create.md" rel="noopener">Claude Messages API</a>: the API the Agents page calls.</li>
+      <li><a href="https://docs.github.com/en/rest/repos/contents" rel="noopener">GitHub REST API: repository contents</a>: how approved changes are committed.</li>
+      <li><a href="https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens" rel="noopener">GitHub fine-grained personal access tokens</a>: how to create the token used for commits.</li>
+      <li><a href="https://code.claude.com/docs/en/sub-agents" rel="noopener">Claude Code subagents</a>: how the agent team is defined.</li>
+      <li><a href="https://playwright.dev/docs/intro" rel="noopener">Playwright</a>: the browser tests.</li>
+    </ul>
+
+    <h2>Web app and accessibility</h2>
+    <ul>
+      <li><a href="https://developer.mozilla.org/en-US/docs/Web/Progressive_web_apps" rel="noopener">MDN: Progressive Web Apps</a>: installing and offline use.</li>
+      <li><a href="https://developer.apple.com/design/human-interface-guidelines/" rel="noopener">Apple Human Interface Guidelines</a>: layout and writing on Apple devices.</li>
+      <li><a href="https://www.w3.org/TR/WCAG22/" rel="noopener">WCAG 2.2</a>: the accessibility standard the app follows.</li>
+    </ul>
+
+    <h2>This project</h2>
+    <ul>
+      <li><a href="https://github.com/atilus2020-design/BeachDay-kakashi" rel="noopener">The GitHub repository</a>: the source code and this site's history.</li>
+      <li><a href="https://mcp-api.netlify.app/" rel="noopener">API directory</a>: where we found the Open-Meteo API.</li>
+      <li><a href="/guide/">Setup and deploy guide</a>: step by step, from running locally to your first sign-in.</li>
+    </ul>
+  </main>
+
+  <footer class="site-footer" data-shell></footer>
+  <noscript>
+    <nav class="site-footer-links" aria-label="Footer">
+      <a href="/resources/">Resources</a>
+      <a href="/guide/">Guide</a>
+      <a href="https://github.com/atilus2020-design/BeachDay-kakashi" rel="noopener">GitHub repo</a>
+      <a href="https://mcp-api.netlify.app/" rel="noopener">API directory</a>
+    </nav>
+    <p>Weather data by Open-Meteo.com. A planning aid, not a safety service.</p>
+  </noscript>
+
+  <script type="module" src="/src/pages/content.ts"></script>
+</body>
+</html>

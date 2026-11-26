@@ -1,0 +1,24 @@
+/* Liquid Glass materials. Glass is ONLY for the navigation/control layer:
+   header/nav, sheets/dialogs, floating controls. Content cards stay solid (--surface). */
+.glass {
+  background: var(--glass-tint);
+  -webkit-backdrop-filter: blur(20px) saturate(160%); backdrop-filter: blur(20px) saturate(160%);
+  border: 1px solid var(--glass-border);
+  box-shadow: inset 0 1px 0 var(--glass-highlight), var(--shadow-2);
+}
+.glass--floating { border-radius: var(--radius-pill); }
+
+/* solid fallbacks */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .glass, .site-header, .sheet, .dialog, .floating-control { background: var(--surface); }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .glass, .site-header, .sheet, .dialog, .floating-control {
+    background: var(--surface); -webkit-backdrop-filter: none; backdrop-filter: none;
+  }
+}
+@media (prefers-contrast: more) {
+  .glass, .site-header, .sheet, .dialog, .floating-control {
+    background: var(--surface); -webkit-backdrop-filter: none; backdrop-filter: none; border-color: var(--line);
+  }
+}

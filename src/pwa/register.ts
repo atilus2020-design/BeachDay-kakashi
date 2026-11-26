@@ -16,9 +16,11 @@ export function registerServiceWorker(): void {
       })
       .catch(() => undefined);
   });
+  // Reload only for a real update; the first-visit clients.claim() must not reload the page.
+  const hadController = !!navigator.serviceWorker.controller;
   let reloading = false;
   navigator.serviceWorker.addEventListener("controllerchange", () => {
-    if (reloading) return;
+    if (!hadController || reloading) return;
     reloading = true;
     window.location.reload();
   });

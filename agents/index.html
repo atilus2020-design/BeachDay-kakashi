@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Agents · Beach Day</title>
+  <meta name="robots" content="noindex">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <meta name="theme-color" content="#0b3d5c">
+  <link rel="icon" href="/icons/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon-180.png">
+  <link rel="stylesheet" href="/src/styles/base.css">
+</head>
+<body>
+  <header class="site-header" data-shell></header>
+  <noscript>
+    <nav class="site-nav" aria-label="Site">
+      <a href="/">Beach Day</a>
+      <a href="/how-it-works/">How it works</a>
+      <a href="/resources/">Resources</a>
+      <a href="/login/">Sign in</a>
+    </nav>
+  </noscript>
+
+  <main id="main" class="page page--wide" tabindex="-1">
+    <noscript><p>Agents needs JavaScript.</p></noscript>
+    <div id="app"></div>
+  </main>
+
+  <footer class="site-footer" data-shell></footer>
+  <script type="module" src="/src/pages/agents.ts"></script>
+</body>
+</html>

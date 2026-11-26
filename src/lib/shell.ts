@@ -16,11 +16,13 @@ const NAV: { id: string; href: string; text: string; match: (p: string) => boole
 
 let signOutHandler: (() => void | Promise<void>) | null = null;
 let navEl: HTMLElement | null = null;
+let authHidden = false;
 let liveEl: HTMLElement | null = null;
 
 function renderAuthSlot(): void {
   if (!navEl) return;
   navEl.querySelector("[data-auth-slot]")?.remove();
+  if (authHidden) return;
   const path = location.pathname;
   let slot: HTMLElement | null = null;
   if (signOutHandler) {
@@ -35,6 +37,13 @@ function renderAuthSlot(): void {
 /** Switch the auth slot after the page knows the session (null hides both Sign in and Sign out where the page shows its own). */
 export function setSignOut(handler: ShellOptions["onSignOut"]): void {
   signOutHandler = handler ?? null;
+  authHidden = false;
+  renderAuthSlot();
+}
+
+/** Hide the Sign in / Sign out slot (e.g. while the Agents page is still checking access). */
+export function hideAuthSlot(): void {
+  authHidden = true;
   renderAuthSlot();
 }
 

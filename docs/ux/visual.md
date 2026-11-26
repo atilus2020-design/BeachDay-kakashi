@@ -23,6 +23,10 @@ Type: `--font --font-round --font-mono --text-s|m|l|xl --text-score`. Motion: `-
 
 **Forms:** `.field` (wrapper), `.field__label`, `.field__hint`, `.input`, `.select`, `.textarea`, `aria-invalid="true"` shows error border, `.field__error` (text + warning glyph; link with `aria-describedby`), `.form-error` (form-level), `.divider` (e.g. "or"), `.auth-card` (narrow login container).
 
+**Checkbox/toggle:** `label.check` wrapping `input[type=checkbox]` (24px box, row min-height 44px) and `span.check__label`, e.g. "Show password". `.form-error` now starts with a CSS "warning" glyph (not colour-only).
+
+**PWA:** `.pwa-banner` (`role="status"` update banner; first child is the text, then a `.btn` Reload), `button.install-btn` (44px, hide with `hidden`), `.install-sheet` (+ `__steps`) inside `.sheet` for iOS "Tap Share, then Add to Home Screen" with a "Not now" `.btn--secondary`.
+
 **Day strip:** `ul/div.day-strip` (scrolls inside itself) containing `button.day-strip__day[aria-pressed]` with `.day-strip__name` and `.day-strip__score`.
 
 **Banners:** `.banner` + `.banner--info|stale|offline|error`, children `.banner__icon`, `.banner__body`, `.banner__action`. Put in an `aria-live="polite"` region.

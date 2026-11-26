@@ -5,7 +5,7 @@ Run on 2026-11-26 with Node v22.23.5. Setup once: `cd knowledge/supabase-auth-en
 | File | What it shows | How verified |
 |---|---|---|
 | `schema.sql` | Re-runnable twin of `supabase/migrations/20261126000000_profiles.sql`: `profiles`, signup trigger `(id, email)` only, RLS with ONE select-own policy, SELECT-only grant, no write grants/policies | executed in PGlite by `test-schema.mjs`, run twice to prove it is re-runnable |
-| `test-schema.mjs` | In-process Postgres with a stub `auth` schema, `auth.uid()`, the `anon`/`authenticated`/`supabase_auth_admin` roles; also applies the real migration file to a fresh db | run, 17 checks ok |
+| `test-schema.mjs` | In-process Postgres with a stub `auth` schema, `auth.uid()`, the `anon`/`authenticated`/`supabase_auth_admin` roles; also applies the real migration file to a fresh db | run, 19 checks ok |
 | `verify-token.mjs` | Minimal raw-HTTP sketch of the guard (no SDK, no CSRF): `GET /auth/v1/user` → `/rest/v1/profiles?select=id,role&id=eq.<id>` with the caller's JWT. The production guard is `netlify/functions/_lib/auth.ts` | run against a mock HTTP server, all ok |
 | `browser-auth.js` | Client setup (PKCE), sign up/in/out, forgot password, Google, `onAuthStateChange`, sending the Bearer token. Production module: `src/lib/auth.ts` | `node --check` only (needs a browser and a project) |
 
@@ -29,6 +29,8 @@ ok   exactly one policy, SELECT — [{"polname":"profiles: read own row","polcmd
 ok   grants: authenticated SELECT only, anon none — [{"grantee":"authenticated","privilege_type":"SELECT"}]
 ok   no column-level write grants — count 0
 ok   signup by supabase_auth_admin creates row; metadata role ignored — [{"role":"user"}]
+ok   promotion SQL skips an unconfirmed account — affected 0
+ok   promotion SQL updates exactly one confirmed account — affected 1
 ok   manual SQL-editor promotion works; A now reads role super_admin
 ok   user B still 'user'
 ok   migration file applies to a fresh db; 1 SELECT policy; SELECT-only grant — [{"grantee":"authenticated","privilege_type":"SELECT"}]

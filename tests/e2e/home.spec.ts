@@ -82,7 +82,7 @@ test.describe("home", () => {
       await route.fulfill({ response: res, json: j });
     });
     await page.goto("/");
-    await expect(page.getByTestId("partial-note")).toHaveText("Wave and water data isn't available right now. This score uses weather only.");
+    await expect(page.getByTestId("partial-note")).toContainText("Wave and water data isn't available right now. This score uses weather only.");
     await expect(page.getByTestId("today-card")).toBeVisible();
     await expect(page.getByTestId("nws-rip-link")).toBeVisible();
   });

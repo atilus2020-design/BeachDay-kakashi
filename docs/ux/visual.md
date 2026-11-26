@@ -37,11 +37,13 @@ Type: `--font --font-round --font-mono --text-s|m|l|xl --text-score`. Motion: `-
 
 **Chat:** `.chat`, `.chat__log` (scrolling, give `role="log"`), `.bubble` + `.bubble--user|assistant` (`aria-busy="true"` shows an ellipsis while streaming), `.tool-row` (+ `.tool-row--error`), `.composer` (sticky glass; contains `.textarea` + `.btn`).
 
-**Proposals / diff:** `.proposal-list`, `.proposal-item`; `.diff` (`<pre>`/div, monospace, wraps) with `.diff__line` + `--add|del|hunk|meta`, each line `<span class="diff__mark">` (CSS draws the `+` / `−` marker for add/del; leave it empty) then a `<span>` of text set via `textContent`. Add `.visually-hidden` "added"/"removed" text if desired.
+**Proposals / diff:** `.proposal-list`, `.proposal-item`; `.diff` (`<pre>`/div, monospace, wraps) with `.diff__line` + `--add|del|hunk|meta`, each line starts with a marker `<span>` holding the real text `+` / `−` (or empty), either `.diff__mark` or `[data-testid="diff-marker"]`, styled monospace and bold, then a `<span>` of text set via `textContent`. CSS draws no marker, so nothing is shown twice. Add `.visually-hidden` "added"/"removed" text if desired.
 
 **Dialog / sheet:** `dialog.dialog` (native; `.dialog__title`, `.dialog__actions`) or `div.dialog` with `.scrim`; `.sheet` (bottom glass sheet); `.install-sheet` + `.install-sheet__steps`; `.floating-control` (fixed glass button).
 
-**Long-form:** wrap in `.prose` (h1-h3, lists, `code`, `pre`, `blockquote`/`.callout`, tables scroll inside). `.link-list` (44px link rows for Resources), `ol.steps` (numbered setup steps for Guide).
+**Long-form:** wrap in `.prose` (or put `.content` on `<main class="page content">`, which shares the same rules; guide copy buttons get 44px targets) (h1-h3, lists, `code`, `pre`, `blockquote`/`.callout`, tables scroll inside). `.link-list` (44px link rows for Resources), `ol.steps` (numbered setup steps for Guide).
 
 ## Contrast results (`node` check over tokens.css; text 4.5:1, UI 3:1)
 All pass in light and dark for: text/text-2 on bg, surface, surface-2; on-accent/accent; accent on surface/bg; on-danger/danger; danger on surface and banner; text on every banner bg; score-great/good/fair/poor as text on surface, bg and their own pill bg; diff text on diff bg; line (3:1 border), focus-ring, accent, danger on bg/surface; text and text-2 over glass tint (0.78 alpha) composited on bg and surface. Only miss: dark text-2 over glass on a pure-white backdrop (4.01) which cannot occur (page is dark navy); reduced-transparency uses solid.
+
+**Layout notes (Wave 3):** `.agent-grid > li` stretch so cards are equal height, the chat button sits at the card bottom; `.proposal-list > .card` has no extra margin (grid gap only); `[data-testid="hourly-list"]` rows are 44px with hairlines; chat panel is a `.section` under the grid.

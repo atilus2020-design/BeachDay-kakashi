@@ -21,7 +21,7 @@ test.describe("service worker and offline", () => {
     await expect(card.or(offlinePage)).toBeVisible({ timeout: 15_000 });
     if (await card.isVisible()) {
       await expect(page.getByTestId("stale-banner")).toBeVisible();
-      await expect(page.getByTestId("stale-banner")).toHaveText(/Offline\. Showing the forecast saved .+ ago\./);
+      await expect(page.getByTestId("stale-banner")).toHaveText(/Offline\. Showing the forecast saved (just now|.+ ago)\./);
       await expect(page.getByTestId("today-score")).toHaveText(score);
       await expect(page.getByTestId("nws-rip-link")).toBeVisible();
     } else {

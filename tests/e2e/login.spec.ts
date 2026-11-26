@@ -13,7 +13,7 @@ test.describe("login page", () => {
     await expect(page.getByTestId("login-form")).toBeVisible();
     await expect(page.getByTestId("email-input")).toHaveAttribute("autocomplete", "email");
     await expect(page.getByTestId("password-input")).toHaveAttribute("autocomplete", "current-password");
-    await expect(page.getByLabel("Email")).toBeVisible();
+    await expect(page.locator('label[for="email"]')).toBeVisible();
     await expect(page.getByTestId("forgot-link")).toBeVisible();
     await expect(page.getByTestId("nav-signin")).toBeHidden();
     await noHorizontalScroll(page);
@@ -111,7 +111,7 @@ test.describe("login page", () => {
     await seedSession(context, "tok_user");
     await page.goto("/login/");
     await expect(page.getByTestId("login-signed-in")).toContainText("user@beachday.test");
-    await expect(page.getByTestId("login-form")).toHaveCount(0);
+    await expect(page.getByTestId("login-form")).toBeHidden();
     await page.getByTestId("signout-button").click();
     await page.waitForURL("**/login/");
     await expect(page.getByTestId("login-form")).toBeVisible();

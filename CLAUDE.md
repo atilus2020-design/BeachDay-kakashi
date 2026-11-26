@@ -1,6 +1,6 @@
 # Beach Day — project guide for Claude
 
-Beach Day is a **PWA on Netlify**: a static front end and Netlify Functions for the Claude and GitHub calls, with **no other servers** (decision D-001). You pick a South Florida beach and it scores today and the next few days from the Open-Meteo forecast and marine APIs. A password- or role-protected **Agent Console** lets the agent team chat and propose code changes. A change is committed to `main` only when the user clicks Approve, which triggers a Netlify redeploy.
+Beach Day is a **PWA on Netlify**: a static front end and Netlify Functions for the Claude and GitHub calls, with **no other servers** (decision D-001). You pick a South Florida beach and it scores today and the next few days from the Open-Meteo forecast and marine APIs. An **Agent Console** protected by Supabase Auth (only the `super_admin` role, decisions D-006 to D-008) lets the agent team chat and propose code changes. A change is committed to `main` only when the user clicks Approve, which triggers a Netlify redeploy.
 
 ## Read first
 

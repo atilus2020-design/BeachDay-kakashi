@@ -19,6 +19,7 @@ export interface Agent extends AgentSummary { system: string }
 
 const SUMMARIES = publicAgents as unknown as AgentSummary[];
 const PRIVATE = privateAgents as unknown as Record<string, AgentPrivate>;
+const MODEL_ALLOW = new Set(["claude-opus-5-5", "claude-sonnet-5-5", "claude-haiku-5-5", "claude-fable-5-2"]);
 export const AGENT_NAME_RE = /^[a-z0-9][a-z0-9-]{0,63}$/;
 
 export function listAgents(): AgentSummary[] {
@@ -30,6 +31,7 @@ export function getAgent(name: unknown): Agent | null {
   if (typeof name !== "string" || !AGENT_NAME_RE.test(name)) return null;
   const summary = SUMMARIES.find((a) => a.name === name);
   const priv = Object.prototype.hasOwnProperty.call(PRIVATE, name) ? PRIVATE[name] : undefined;
-  if (!summary || !priv) return null;
+  if (!summary || !priv || typeof priv.system !== "string") return null;
+  if (!MODEL_ALLOW.has(priv.model)) return null; // runtime check on top of the build-time one
   return { ...summary, model: priv.model, system: priv.system };
 }

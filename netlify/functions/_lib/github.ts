@@ -1,10 +1,12 @@
 // GitHub REST client for the Agent Console (doc 04 §4.4, §4.6; github-commits skill; D-003, D-005).
 // The target repository comes only from GITHUB_REPO; GITHUB_API_URL overrides the base for mocks.
 import path from "node:path";
+import { isReadablePath } from "./allowlist.ts";
 
 export const GITHUB_API_VERSION = "2026-03-10";
 const READ_MAX_BYTES = 200 * 1024;
 const REQUEST_TIMEOUT_MS = 10_000;
+const COMMIT_DEADLINE_MS = 45_000;
 
 export class GitHubError extends Error {
   status: number;
@@ -101,7 +103,9 @@ export async function getFile(p: string, ref: string, signal?: AbortSignal): Pro
   if (r.status === 404) return null;
   if (r.status !== 200) throw new GitHubError(`GitHub contents → ${r.status}`, r.status);
   const j = r.json;
-  if (Array.isArray(j) || j?.type !== "file") throw new Error("not a file");
+  // Only a regular file at exactly this path: a symlink (type "symlink", or a "file" whose path differs
+  // because GitHub followed the link) or a submodule is refused.
+  if (Array.isArray(j) || j?.type !== "file" || j?.path !== p) throw new Error("not a file");
   const size = Number(j.size) || 0;
   let text: string | null = null;
   if (size <= READ_MAX_BYTES && j.encoding === "base64" && typeof j.content === "string") {
@@ -135,7 +139,7 @@ export async function listDir(dir: string, signal?: AbortSignal): Promise<{ path
   if (r.status !== 200) throw new GitHubError(`GitHub contents → ${r.status}`, r.status);
   if (!Array.isArray(r.json)) throw new Error("not a directory");
   const entries = r.json
-    .filter((e: any) => typeof e?.name === "string" && !isHiddenSecret(e.name) && e.name !== ".git")
+    .filter((e: any) => typeof e?.name === "string" && !isHiddenSecret(e.name) && isReadablePath(safe ? `${safe}/${e.name}` : e.name))
     .slice(0, 500)
     .map((e: any) => ({ name: e.name, type: e.type === "dir" ? "dir" : e.type === "file" ? "file" : String(e.type), ...(e.type === "file" ? { size: Number(e.size) || 0 } : {}) }));
   return { path: safe, entries };
@@ -157,20 +161,27 @@ export async function commitToMain(opts: {
   fileShas: Record<string, string | null>;
 }): Promise<{ sha: string; url: string }> {
   const { repo } = githubConfig();
+  const signal = AbortSignal.timeout(COMMIT_DEADLINE_MS); // the whole commit, retries included
   for (let attempt = 0; attempt < 2; attempt++) {
-    const head = await getHeadSha();
+    const head = await getHeadSha(signal);
     if (head !== opts.baseSha) {
-      for (const f of opts.files) {
-        const cur = await getFile(f.path, head).catch((e) => {
-          if (e instanceof GitHubError) throw e;
-          return { sha: "__not_a_file__" } as RepoFile; // became a directory → stale
-        });
-        const curSha = cur ? cur.sha : null;
+      const current = await Promise.all(
+        opts.files.map((f) =>
+          getFile(f.path, head, signal).then(
+            (cur) => (cur ? cur.sha : null),
+            (e) => {
+              if (e instanceof GitHubError || (e as Error)?.name === "TimeoutError" || (e as Error)?.name === "AbortError") throw e;
+              return "__not_a_file__"; // became a directory or symlink → stale
+            },
+          ),
+        ),
+      );
+      opts.files.forEach((f, i) => {
         const expected = Object.prototype.hasOwnProperty.call(opts.fileShas, f.path) ? opts.fileShas[f.path] : undefined;
-        if (expected === undefined || curSha !== expected) throw new StaleError();
-      }
+        if (expected === undefined || current[i] !== expected) throw new StaleError();
+      });
     }
-    const baseTree = (await ghOk("GET", `/git/commits/${head}`))?.tree?.sha;
+    const baseTree = (await ghOk("GET", `/git/commits/${head}`, undefined, signal))?.tree?.sha;
     if (typeof baseTree !== "string") throw new GitHubError("bad commit response", 502);
     const tree = await ghOk("POST", "/git/trees", {
       base_tree: baseTree,
@@ -179,10 +190,10 @@ export async function commitToMain(opts: {
           ? { path: f.path, mode: "100644", type: "blob", sha: null }
           : { path: f.path, mode: "100644", type: "blob", content: f.content },
       ),
-    });
-    const commit = await ghOk("POST", "/git/commits", { message: opts.message, tree: tree?.sha, parents: [head] });
+    }, signal);
+    const commit = await ghOk("POST", "/git/commits", { message: opts.message, tree: tree?.sha, parents: [head] }, signal);
     if (typeof commit?.sha !== "string") throw new GitHubError("bad commit response", 502);
-    const upd = await gh("PATCH", "/git/refs/heads/main", { sha: commit.sha, force: false });
+    const upd = await gh("PATCH", "/git/refs/heads/main", { sha: commit.sha, force: false }, signal);
     if (upd.status >= 200 && upd.status < 300) {
       return { sha: commit.sha, url: `https://github.com/${repo}/commit/${commit.sha}` };
     }

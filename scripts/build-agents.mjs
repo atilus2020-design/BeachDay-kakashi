@@ -7,7 +7,7 @@
 //
 // system = agent body + every skill in its `skills:` list + its knowledge files,
 // capped at ~120,000 characters (examples are truncated first, then docs, then skills).
-import { readFileSync, readdirSync, statSync, mkdirSync, writeFileSync, existsSync } from "node:fs";
+import { readFileSync, readdirSync, lstatSync, mkdirSync, writeFileSync, existsSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -22,6 +22,8 @@ const MAX_KNOWLEDGE_FILE = 20_000; // skip larger fixtures/files from the prompt
 const ALIASES = { opus: "claude-opus-5-5", inherit: "claude-opus-5-5", sonnet: "claude-sonnet-5-5", haiku: "claude-haiku-5-5" };
 const MODEL_ALLOW = new Set(["claude-opus-5-5", "claude-sonnet-5-5", "claude-haiku-5-5", "claude-fable-5-2"]);
 const TEXT_EXT = new Set([".md", ".mjs", ".js", ".ts", ".mts", ".json", ".sql", ".txt", ".css", ".html", ".yml", ".yaml", ".toml", ".svg"]);
+// Secret VALUES (not the bare prefixes, which the docs legitimately mention as "never use sb_secret_…").
+const SECRET_VALUE_RE = /sk-ant-[A-Za-z0-9_-]{16,}|github_pat_[A-Za-z0-9_]{16,}|sb_secret_[A-Za-z0-9_-]{8,}|eyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/;
 const SKIP_NAMES = new Set(["package-lock.json", "node_modules", ".DS_Store"]);
 
 function fail(msg) {
@@ -101,7 +103,8 @@ function walk(dir) {
   for (const name of readdirSync(dir).sort()) {
     if (SKIP_NAMES.has(name)) continue;
     const full = path.join(dir, name);
-    const st = statSync(full);
+    const st = lstatSync(full); // never follow symlinks out of the knowledge folder
+    if (st.isSymbolicLink()) continue;
     if (st.isDirectory()) out.push(...walk(full));
     else if (st.isFile()) out.push(full);
   }
@@ -166,7 +169,7 @@ function build() {
     for (const s of skills) {
       if (!/^[a-z0-9-]+$/.test(s)) fail(`${file}: bad skill name ${s}`);
       const p = path.join(SKILLS_DIR, s, "SKILL.md");
-      if (!existsSync(p)) fail(`${file}: skill ${s} not found (${path.relative(ROOT, p)})`);
+      if (!existsSync(p) || lstatSync(p).isSymbolicLink()) fail(`${file}: skill ${s} not found (${path.relative(ROOT, p)})`);
       sections.push({ prio: 1, text: `<skill name="${s}">\n${readFileSync(p, "utf8").trim()}\n</skill>` });
     }
     for (const k of knowledge) {
@@ -174,6 +177,8 @@ function build() {
       sections.push({ prio: k.kind === "docs" ? 2 : 3, text: `<knowledge path="${k.path}">\n${k.text.trim()}\n</knowledge>` });
     }
     const system = assemble(sections, SYSTEM_CAP);
+    const leak = SECRET_VALUE_RE.exec(system);
+    if (leak) fail(`${file}: system prompt contains something that looks like a secret (${leak[0].slice(0, 12)}…)`);
 
     summaries.push({
       name,

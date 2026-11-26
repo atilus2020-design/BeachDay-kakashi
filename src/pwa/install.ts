@@ -35,9 +35,12 @@ export function showInstallButton(container: HTMLElement): () => void {
     container.replaceChildren();
     if (isStandalone()) return;
     if (deferred) {
+      const wrap = document.createElement("div");
+      wrap.className = "install-android";
       const btn = document.createElement("button");
       btn.type = "button";
       btn.className = "install-btn";
+      btn.setAttribute("data-testid", "install-button");
       btn.textContent = "Install Beach Day";
       btn.addEventListener("click", async () => {
         const ev = deferred;
@@ -47,19 +50,36 @@ export function showInstallButton(container: HTMLElement): () => void {
         await ev.userChoice.catch(() => undefined);
         render();
       });
-      container.append(btn);
+      const later = document.createElement("button");
+      later.type = "button";
+      later.className = "install-dismiss";
+      later.setAttribute("data-testid", "install-dismiss");
+      later.textContent = "Not now";
+      later.addEventListener("click", () => { remember(); container.replaceChildren(); });
+      wrap.append(btn, later);
+      if (!dismissed()) container.append(wrap);
     } else if (isIOS() && !dismissed()) {
       const sheet = document.createElement("div");
       sheet.className = "install-sheet";
       sheet.setAttribute("role", "region");
       sheet.setAttribute("aria-label", "Install Beach Day");
-      const p = document.createElement("p");
-      p.textContent = "Install Beach Day: Tap Share, then Add to Home Screen.";
+      sheet.setAttribute("data-testid", "install-ios-sheet");
+      const h = document.createElement("h2");
+      h.textContent = "Install Beach Day";
+      const intro = document.createElement("p");
+      intro.textContent = "Add it to your Home Screen to open it like an app.";
+      const ol = document.createElement("ol");
+      for (const t of ["Tap the Share button.", "Tap Add to Home Screen.", "Tap Add."]) {
+        const li = document.createElement("li");
+        li.textContent = t;
+        ol.append(li);
+      }
       const close = document.createElement("button");
       close.type = "button";
-      close.textContent = "Not now";
+      close.setAttribute("data-testid", "install-ios-dismiss");
+      close.textContent = "Got it";
       close.addEventListener("click", () => { remember(); render(); });
-      sheet.append(p, close);
+      sheet.append(h, intro, ol, close);
       container.append(sheet);
     }
   };

@@ -9,9 +9,11 @@ const num = (v: string | undefined, d: number) => {
   const n = Number(v);
   return Number.isFinite(n) && n > 0 ? Math.floor(n) : d;
 };
+// Defaults when the env vars are unset (security review): 100 turns and 1,000,000 tokens per day,
+// applied both per user and globally. Override with DAILY_CHAT_LIMIT / DAILY_TOKEN_LIMIT.
 export const limits = () => ({
-  turns: num(process.env.DAILY_CHAT_LIMIT, 200),
-  tokens: num(process.env.DAILY_TOKEN_LIMIT, 2_000_000),
+  turns: num(process.env.DAILY_CHAT_LIMIT, 100),
+  tokens: num(process.env.DAILY_TOKEN_LIMIT, 1_000_000),
 });
 
 const keys = (userId: string, day = today()) => [`chat/${day}/global`, `chat/${day}/user/${userId}`];

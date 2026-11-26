@@ -5,7 +5,8 @@ import { audit, auditDenied } from "./_lib/audit.ts";
 import { store, proposalKey, PROPOSAL_ID_RE } from "./_lib/blobs.ts";
 
 const LIST_MAX = 50;
-const SCAN_MAX = 500;
+const SCAN_MAX = 100; // newest keys only (ids are time-sortable)
+const BATCH = 10;
 const APPROVING_STALE_MS = 120_000;
 const STATUSES = new Set(["pending", "approved", "rejected", "all"]);
 
@@ -55,11 +56,10 @@ export default async (req: Request, ctx: Context) => {
       if (!STATUSES.has(status)) return json(400, { error: "Invalid request" });
       const { blobs } = await s.list({ prefix: "proposal/" });
       const keys = blobs.map((b) => b.key).sort().reverse().slice(0, SCAN_MAX); // ids are time-sortable
-      const out = [];
-      for (const k of keys) {
-        if (out.length >= LIST_MAX) break;
-        const p = await s.get(k, { type: "json" });
-        if (p && (status === "all" || p.status === status)) out.push(summaryOf(p));
+      const out: ReturnType<typeof summaryOf>[] = [];
+      for (let i = 0; i < keys.length && out.length < LIST_MAX; i += BATCH) {
+        const batch = await Promise.all(keys.slice(i, i + BATCH).map((k) => s.get(k, { type: "json" })));
+        for (const p of batch) if (p && (status === "all" || p.status === status) && out.length < LIST_MAX) out.push(summaryOf(p));
       }
       out.sort((a, b) => (a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0));
       return json(200, { proposals: out });

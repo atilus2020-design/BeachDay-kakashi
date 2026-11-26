@@ -32,12 +32,14 @@ function promptReload(worker: ServiceWorker): void {
   bar.id = "sw-update";
   bar.className = "pwa-banner";
   bar.setAttribute("role", "status");
+  bar.setAttribute("data-testid", "update-banner");
   const msg = document.createElement("span");
-  msg.textContent = "New version available";
+  msg.textContent = "A new version is ready.";
   const btn = document.createElement("button");
   btn.type = "button";
   btn.textContent = "Reload";
+  btn.setAttribute("data-testid", "update-reload-button");
   btn.addEventListener("click", () => worker.postMessage({ type: "SKIP_WAITING" }));
-  bar.append(msg, " — ", btn);
+  bar.append(msg, " ", btn);
   document.body.append(bar);
 }

@@ -161,8 +161,8 @@ export async function createProposal(input: any, tc: TurnContext): Promise<{ id:
   const diffs = [];
   for (const f of files) {
     const cur = await getFile(f.path, baseSha, tc.signal).catch((e) => {
-      if (e instanceof GitHubError) throw e;
-      throw new Error(`${f.path} is not a file`);
+      if (e instanceof GitHubError || e?.name === "TimeoutError" || e?.name === "AbortError") throw e;
+      throw new Error(`${f.path} is not a regular file`);
     });
     if (f.action === "create" && cur) throw new Error(`${f.path} already exists; use action "update"`);
     if (f.action !== "create" && !cur) throw new Error(`${f.path} does not exist; use action "create"`);

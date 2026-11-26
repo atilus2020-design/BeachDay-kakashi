@@ -117,6 +117,7 @@ Reason sentences come from the scoring engine (plain, specific, under 60 charact
 | Google cancelled or failed | Google sign-in didn't finish. Try again. |
 | Expired confirmation link | That link expired. Log in, or sign up again to get a new one. |
 | Anything else | Something went wrong. Try again. |
+| Sign-in not set up (no Supabase keys; `form-error`, also on /login/reset/) | Sign-in isn't set up on this site yet. Try again later. |
 
 ### Confirm email and forgot password
 
@@ -353,6 +354,7 @@ h1: Resources. h2s as in the table (sentence case).
 | offline-page h1 | You're offline |
 | offline-page body | Beach Day needs a connection the first time. Once you've loaded a forecast, it's saved for next time. |
 | offline-retry | Try again |
+| offline-page body (approved variant, Wave 3) | No signal right now, and we don't have this page saved yet. Forecasts you've already looked at will show again once you open them. |
 
 ## 10. Voice checklist
 

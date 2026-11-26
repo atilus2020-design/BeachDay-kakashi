@@ -11,11 +11,11 @@
   <link rel="stylesheet" href="/offline.css">
 </head>
 <body>
-  <main>
+  <main id="main" data-testid="offline-page">
     <img src="/icons/icon-192.png" alt="" width="96" height="96">
     <h1>You're offline</h1>
     <p>No signal right now, and we don't have this page saved yet. Forecasts you've already looked at will show again once you open them.</p>
-    <a class="btn" href="/">Try again</a>
+    <a class="btn" href="/" data-testid="offline-retry">Try again</a>
   </main>
 </body>
 </html>

@@ -1,5 +1,9 @@
 import { test, expect } from "@playwright/test";
+import { readFileSync } from "node:fs";
 import { resetMocks, noHorizontalScroll, expectNoSeriousAxe, expectTarget44 } from "./helpers.ts";
+
+const beaches: { id: string; nwsUrl: string }[] = JSON.parse(readFileSync(new URL("../../src/data/beaches.json", import.meta.url), "utf8"));
+const nwsUrl = (id: string) => beaches.find((b) => b.id === id)!.nwsUrl;
 
 test.use({ serviceWorkers: "block" });
 test.beforeEach(resetMocks);
@@ -18,7 +22,7 @@ test.describe("home", () => {
     await expect(page.getByTestId("reasons-list")).toBeVisible();
     const nws = page.getByTestId("nws-rip-link");
     await expect(nws).toHaveText("Check today's rip current risk (National Weather Service)");
-    await expect(nws).toHaveAttribute("href", "https://www.weather.gov/safety/ripcurrent");
+    await expect(nws).toHaveAttribute("href", nwsUrl("south-beach"));
     await expect(nws).toHaveAttribute("rel", /noopener/);
     await expect(page.getByTestId("uv-badge")).toHaveText(/^UV \d+/);
     await expect(page.getByTestId("updated-line")).toContainText("Updated");
@@ -58,6 +62,7 @@ test.describe("home", () => {
     await expect(page.getByTestId("day-detail-score")).toHaveText(/^\d{1,3}$/);
     await expect(page.getByTestId("hour-row").first()).toBeVisible();
     await expect(page.getByTestId("day-detail-nws-link")).toHaveText("Check today's rip current risk (National Weather Service)");
+    await expect(page.getByTestId("day-detail-nws-link")).toHaveAttribute("href", nwsUrl("south-beach"));
     await expect(page.getByTestId("day-detail-uv")).toBeVisible();
     await page.getByTestId("day-detail-close").click();
     await expect(d).toBeHidden();

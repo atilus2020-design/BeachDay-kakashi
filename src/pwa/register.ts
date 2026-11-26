@@ -1,4 +1,4 @@
-// Registers /sw.js (production builds only) and shows "New version available — Reload".
+// Registers /sw.js (production builds only) and shows the update banner: "A new version is ready." + Reload.
 export function registerServiceWorker(): void {
   if (!import.meta.env.PROD || !("serviceWorker" in navigator)) return;
   window.addEventListener("load", () => {

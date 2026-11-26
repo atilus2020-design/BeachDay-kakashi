@@ -69,6 +69,7 @@ export function showInstallButton(container: HTMLElement): () => void {
       const intro = document.createElement("p");
       intro.textContent = "Add it to your Home Screen to open it like an app.";
       const ol = document.createElement("ol");
+      ol.className = "install-sheet__steps";
       for (const t of ["Tap the Share button.", "Tap Add to Home Screen.", "Tap Add."]) {
         const li = document.createElement("li");
         li.textContent = t;
@@ -76,6 +77,7 @@ export function showInstallButton(container: HTMLElement): () => void {
       }
       const close = document.createElement("button");
       close.type = "button";
+      close.className = "btn btn--secondary";
       close.setAttribute("data-testid", "install-ios-dismiss");
       close.textContent = "Got it";
       close.addEventListener("click", () => { remember(); render(); });

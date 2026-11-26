@@ -113,3 +113,9 @@ export async function createProposalViaChat(page: Page, agent = "open-meteo-inte
   await expect(page.getByTestId("proposal-detail")).toBeVisible();
   await expect(page.getByTestId("proposal-title")).toHaveText(PROPOSAL_TITLE);
 }
+
+/** The iOS "Add to Home Screen" sheet appears on iPhone user agents and can cover the strip; dismiss it like a user would. */
+export async function dismissInstallSheet(page: Page) {
+  const btn = page.getByTestId("install-ios-dismiss");
+  if (await btn.isVisible().catch(() => false)) { await btn.click(); await expect(btn).toBeHidden(); }
+}

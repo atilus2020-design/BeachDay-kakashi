@@ -202,7 +202,12 @@ dialog.dialog::backdrop { background: var(--scrim); }
 .dialog__actions { display: flex; flex-wrap: wrap; gap: var(--space-3); margin-top: var(--space-5); }
 .sheet { position: fixed; z-index: 50; left: var(--space-2); right: var(--space-2); bottom: calc(var(--space-2) + var(--safe-bottom)); max-width: 560px; margin: 0 auto;
   border-radius: var(--radius-l); padding: var(--space-5); color: var(--text); animation: bd-rise var(--dur-slow) var(--ease); }
-.install-sheet { display: flex; flex-direction: column; gap: var(--space-3); }
+/* Inline in the content flow (after the Today card): solid surface, no glass, not fixed. */
+.install-sheet, .sheet.install-sheet { position: static; left: auto; right: auto; bottom: auto; max-width: none; margin: var(--space-4) 0; animation: none;
+  display: flex; flex-direction: column; gap: var(--space-3); background: var(--surface); color: var(--text); border: 1px solid var(--line-soft);
+  -webkit-backdrop-filter: none; backdrop-filter: none; box-shadow: var(--shadow-1); }
+.install-sheet .btn, .install-sheet .btn--secondary { background: var(--surface); color: var(--accent); border-color: var(--line); }
+.install-sheet .btn--primary { background: var(--accent); color: var(--on-accent); border-color: transparent; }
 .install-sheet__steps { margin: 0; padding-left: var(--space-5); }
 .install-sheet__steps li { padding: var(--space-1) 0; }
 .floating-control { position: fixed; z-index: 30; right: calc(var(--space-4) + var(--safe-right)); bottom: calc(var(--space-4) + var(--safe-bottom));

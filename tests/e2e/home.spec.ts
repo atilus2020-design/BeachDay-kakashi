@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { readFileSync } from "node:fs";
-import { resetMocks, noHorizontalScroll, expectNoSeriousAxe, expectTarget44 } from "./helpers.ts";
+import { dismissInstallSheet, resetMocks, noHorizontalScroll, expectNoSeriousAxe, expectTarget44 } from "./helpers.ts";
 
 const beaches: { id: string; nwsUrl: string }[] = JSON.parse(readFileSync(new URL("../../src/data/beaches.json", import.meta.url), "utf8"));
 const nwsUrl = (id: string) => beaches.find((b) => b.id === id)!.nwsUrl;
@@ -53,6 +53,8 @@ test.describe("home", () => {
   test("day detail: opens, shows hourly rows for early days only, closes", async ({ page }) => {
     await page.goto("/");
     const cells = page.getByTestId("day-cell");
+    await expect(cells).toHaveCount(7);
+    await dismissInstallSheet(page);
     await expect(page.getByTestId("day-detail")).toBeHidden();
     await cells.nth(1).click();
     await expect(cells.nth(1)).toHaveAttribute("aria-pressed", "true");
@@ -117,6 +119,7 @@ test.describe("home", () => {
     // score, label and best window fit above the fold on a 667 px phone
     const b = await page.getByTestId("today-label").boundingBox();
     expect(b!.y + b!.height).toBeLessThanOrEqual(667);
+    await dismissInstallSheet(page);
     await page.getByTestId("day-cell").first().click();
     await noHorizontalScroll(page);
   });

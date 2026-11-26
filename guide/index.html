@@ -34,25 +34,25 @@
       <ol>
         <li>On GitHub, open the <a href="https://github.com/atilus2020-design/BeachDay-kakashi" target="_blank" rel="noopener noreferrer">Beach Day repository</a>, then click <strong>Fork</strong>.</li>
         <li>In a terminal, clone your fork and install the packages. Replace <code>&lt;your-user&gt;</code> with your GitHub user name:
-          <pre data-testid="guide-code"><code>git clone https://github.com/&lt;your-user&gt;/BeachDay-kakashi.git
+          <pre data-testid="guide-code" tabindex="0" aria-label="Code example 1"><code>git clone https://github.com/&lt;your-user&gt;/BeachDay-kakashi.git
 cd BeachDay-kakashi
 npm install
 npm run build:agents</code></pre>
           <button type="button" data-testid="guide-copy-button">Copy</button>
         </li>
         <li>In the first terminal, start the mock services and leave them running. They listen on <code>http://127.0.0.1:9100</code>:
-          <pre data-testid="guide-code"><code>npm run mocks</code></pre>
+          <pre data-testid="guide-code" tabindex="0" aria-label="Code example 2"><code>npm run mocks</code></pre>
           <button type="button" data-testid="guide-copy-button">Copy</button>
         </li>
         <li>In a second terminal, in the same folder, load the test settings and start the app:
-          <pre data-testid="guide-code"><code>set -a; source tests/mocks/test.env; set +a
+          <pre data-testid="guide-code" tabindex="0" aria-label="Code example 3"><code>set -a; source tests/mocks/test.env; set +a
 npm run dev</code></pre>
           <button type="button" data-testid="guide-copy-button">Copy</button>
         </li>
         <li>Open <code>http://localhost:8888</code> in your browser. You should see the beach picker and a score.</li>
       </ol>
       <p>If <code>npm run dev</code> stops with <code>fetch failed</code> after it loads the functions, use the offline form that the browser tests use. It does not need access to Netlify:</p>
-      <pre data-testid="guide-code"><code>set -a; source tests/mocks/test.env; set +a
+      <pre data-testid="guide-code" tabindex="0" aria-label="Code example 4"><code>set -a; source tests/mocks/test.env; set +a
 npx netlify dev --offline --port 8888</code></pre>
       <button type="button" data-testid="guide-copy-button">Copy</button>
     </section>
@@ -66,7 +66,7 @@ npx netlify dev --offline --port 8888</code></pre>
         <li>Open <strong>Authentication → Sign In / Providers → Email</strong>. Turn on <strong>Email</strong> and <strong>Confirm email</strong>, and set the minimum password length to <strong>12</strong>. Save.</li>
         <li>Open <strong>Authentication → URL Configuration</strong>. Set <strong>Site URL</strong> to your production address, for example <code>https://your-site.netlify.app</code>. You can change it once Netlify gives you the address in Part 4.</li>
         <li>In <strong>Redirect URLs</strong>, add exactly these two entries, and no others. Replace the host with your site address:
-          <pre data-testid="guide-code"><code>https://your-site.netlify.app/login/
+          <pre data-testid="guide-code" tabindex="0" aria-label="Code example 5"><code>https://your-site.netlify.app/login/
 https://your-site.netlify.app/login/reset/</code></pre>
           <button type="button" data-testid="guide-copy-button">Copy</button>
           <p>Do not use wildcards (<code>**</code>). Do not add <code>localhost</code> to this production project. For local sign-in, use a separate development Supabase project.</p>
@@ -83,7 +83,7 @@ https://your-site.netlify.app/login/reset/</code></pre>
         <li>Click <strong>Create credentials → OAuth client ID</strong>. Choose <strong>Web application</strong>.</li>
         <li>Under <strong>Authorized JavaScript origins</strong>, add only your site origin, for example <code>https://your-site.netlify.app</code>.</li>
         <li>Under <strong>Authorized redirect URIs</strong>, add only the Supabase callback. Replace <code>&lt;project-ref&gt;</code> with the reference in your Project URL:
-          <pre data-testid="guide-code"><code>https://&lt;project-ref&gt;.supabase.co/auth/v1/callback</code></pre>
+          <pre data-testid="guide-code" tabindex="0" aria-label="Code example 6"><code>https://&lt;project-ref&gt;.supabase.co/auth/v1/callback</code></pre>
           <button type="button" data-testid="guide-copy-button">Copy</button>
         </li>
         <li>Click <strong>Create</strong>. Copy the client ID and the client secret.</li>
@@ -125,7 +125,8 @@ https://your-site.netlify.app/login/reset/</code></pre>
         <li>Click <strong>Save</strong> after the last variable.</li>
         <li>Open <strong>Deploys</strong>, then click <strong>Trigger deploy → Deploy site</strong>. Variables take effect only in a new deploy.</li>
       </ol>
-      <table>
+      <div role="region" tabindex="0" aria-label="Environment variables table">
+<table>
         <thead>
           <tr><th scope="col">Name</th><th scope="col">Scope and context</th><th scope="col">Example format (fake)</th><th scope="col">Purpose</th></tr>
         </thead>
@@ -141,6 +142,7 @@ https://your-site.netlify.app/login/reset/</code></pre>
           <tr><th scope="row"><code>DAILY_TOKEN_LIMIT</code></th><td>Functions</td><td><code>2000000</code></td><td>Claude tokens allowed per user and in total each day</td></tr>
         </tbody>
       </table>
+      </div>
       <p>Do not set these local-only variables in Netlify: <code>OPEN_METEO_BASE</code>, <code>OPEN_METEO_MARINE_BASE</code>, <code>ANTHROPIC_BASE_URL</code> or <code>GITHUB_API_URL</code>. They point the app at the local mocks. Never set a Supabase secret key, a <code>service_role</code> key, a JWT secret, <code>CONSOLE_PASSWORD_HASH</code> or <code>SESSION_SECRET</code>. The build fails if it finds a Supabase secret or service-role key.</p>
     </section>
 
@@ -160,7 +162,7 @@ https://your-site.netlify.app/login/reset/</code></pre>
         <li>Open <code>https://your-site.netlify.app/login/</code> and choose <strong>Sign up</strong>. Enter your email and a password of at least 12 characters.</li>
         <li>Open the confirmation email and click the link. The email comes from Supabase, and the built-in email service sends only 2 emails an hour. If you hit that limit, wait an hour, or set up custom SMTP in Supabase.</li>
         <li>In Supabase, open <strong>SQL Editor</strong>, click <strong>New query</strong>, and run this. Replace <code>you@example.com</code> with the email you signed up with. The statement is the promotion SQL from the migration, which only works once the email is confirmed:
-          <pre data-testid="guide-code"><code>update public.profiles p set role = 'super_admin'
+          <pre data-testid="guide-code" tabindex="0" aria-label="Code example 7"><code>update public.profiles p set role = 'super_admin'
 from auth.users u
 where p.id = u.id and u.email = 'you@example.com' and u.email_confirmed_at is not null;</code></pre>
           <button type="button" data-testid="guide-copy-button">Copy</button>

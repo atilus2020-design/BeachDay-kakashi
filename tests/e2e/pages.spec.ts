@@ -59,11 +59,12 @@ test.describe("shell and content pages", () => {
     const links = page.getByTestId("resource-link");
     const n = await links.count(); expect(n).toBeGreaterThan(5);
     for (let i = 0; i < n; i++) {
-      await expect(links.nth(i)).toHaveAttribute("rel", /noopener/);
+      const href = (await links.nth(i).getAttribute("href")) || "";
+      if (/^https?:/.test(href)) await expect(links.nth(i)).toHaveAttribute("rel", /noopener/); // internal links need no rel
       expect((await links.nth(i).innerText()).trim().toLowerCase()).not.toBe("click here");
     }
     await expect(page.getByTestId("resource-guide-link")).toBeVisible();
-    await expect(page.getByTestId("resource-api-link")).toHaveAttribute("href", "https://mcp-api.netlify.app/");
+    await expect(page.getByTestId("resource-api-link").locator("a").first()).toHaveAttribute("href", "https://mcp-api.netlify.app/");
   });
   test("guide: numbered steps and copy buttons", async ({ page }) => {
     await page.goto("/guide/");

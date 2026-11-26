@@ -4,7 +4,7 @@
 
 **Scope:** sign-in with Supabase Auth (email and password, and Continue with Google), the `profiles` table and its roles, every Netlify Function under `/api/`, the Approve → commit flow, secrets and environment variables.
 
-**Replaces:** the shared-password gate and HMAC session cookie in `docs/04-agent-console.md` §4.5.2. `CONSOLE_PASSWORD_HASH`, `SESSION_SECRET`, the `bd_session` cookie and `/api/auth/login` and `/api/auth/logout` are retired.
+**Implements:** decisions D-006 (Supabase Auth), D-007 (roles in `profiles` with RLS) and D-008 (URL + publishable key only; token and role checked in every Function). **Replaces:** the shared-password gate and HMAC session cookie in `docs/04-agent-console.md` §4.5.2. `CONSOLE_PASSWORD_HASH`, `SESSION_SECRET`, the `bd_session` cookie and `/api/auth/login` and `/api/auth/logout` are retired.
 
 Facts below were checked against the official pages listed in §9 on 2026-11-26.
 
@@ -22,7 +22,7 @@ Browser (static PWA)                              Supabase (Auth + Postgres)
      │  fetch /api/...  Authorization: Bearer <access token>
      │                  X-Requested-With: beachday
      ▼
-Netlify Function ── guard(): verify token with Supabase Auth (getUser)
+Netlify Function ── requireRole(): verify token with Supabase Auth (getUser)
                   ── read role from public.profiles AS THE CALLER (their JWT, under RLS)
                   ── role !== 'super_admin' → 403
                   ── then Claude / GitHub work with ANTHROPIC_API_KEY / GITHUB_TOKEN
@@ -57,16 +57,16 @@ Each rule names the threat it stops. "Must" is mandatory; the build or QA fails 
 
 ### R1. Every protected Function authenticates every request server-side (T1, T2, T8)
 
-Every Function under `/api/` except the public forecast endpoints runs the shared guard (`netlify/functions/_lib/auth.ts`, §5) **first**, before parsing the body, touching Blobs, or calling Claude or GitHub. Default deny: if any step fails or throws, the request is refused.
+Every Function under `/api/` except the public forecast endpoints runs the shared guard `requireRole(req, ctx, "super_admin")` (`netlify/functions/_lib/auth.ts`, §5) **first**, before parsing the body, touching Blobs, or calling Claude or GitHub. Default deny: if any step fails or throws, the request is refused.
 
 - The token comes **only** from the `Authorization: Bearer <access token>` header. Never from a cookie, query string or body.
-- The token is verified **by Supabase**, not by decoding it: `supabase.auth.getUser(jwt)`. Supabase's reference says `getUser` "validates the user's access token JWT on the server" and "should always be used when checking for user authorization on the server"; `getSession` "is insecure on the server". `getClaims(jwt)` (local JWKS verification with asymmetric signing keys) is an acceptable faster alternative, but `getUser` is the default because it also returns the user's current state from Auth.
+- The token is verified **by Supabase**, not by decoding it: `supabase.auth.getUser(jwt)`. Supabase's reference says `getUser` "validates the user's access token JWT on the server" and "should always be used when checking for user authorization on the server"; `getSession` "is insecure on the server". `getUser` asks the Auth server, which also rejects tokens whose session no longer exists (`session_not_found`, e.g. after sign-out). `getClaims(jwt)` (local JWKS verification) is allowed later only once the project uses asymmetric signing keys, and then the JWT expiry must stay short, because local verification accepts a signed-out token until it expires (D-008). A shared JWT secret is never used.
 - Never hand-roll JWT verification and never read claims from an unverified token.
 
 ### R2. The role is read from `public.profiles` with the caller's JWT, under RLS, on every request (T3, T12)
 
 - After R1 succeeds, the guard runs `select role from public.profiles where id = <user.id>` using a Supabase client created with the **publishable key** and the header `Authorization: Bearer <caller's access token>`. RLS limits that query to the caller's own row.
-- Allow only if exactly one row comes back and `role === 'super_admin'`. Zero rows, an error, or any other value → **403**.
+- Allow only if exactly one row comes back, its `id` equals the verified user id, and `role === 'super_admin'`. Zero rows or any other value → **403**. Supabase unreachable or 5xx → **503** (fail closed; never "allowed").
 - **Never** trust a role from: the request body or headers, the JWT's `role` claim (that is the Postgres role, `authenticated`, used for RLS, not our app role), `user_metadata` / `raw_user_meta_data` (users can edit it), or browser state.
 - Reading the role per request (rather than baking it into a custom JWT claim) means a demotion takes effect on the next request, not when the token expires.
 - The UI may also read the user's own profile row to decide whether to show the Agents link. That is **cosmetic only**; the Functions decide.
@@ -78,7 +78,7 @@ Every Function under `/api/` except the public forecast endpoints runs the share
 
   ```sql
   update public.profiles set role = 'super_admin'
-  where id = (select id from auth.users where email = 'owner@example.com');
+  where email = 'owner@example.com';
   ```
 
   Demote with `set role = 'user'`. Keep the number of `super_admin` rows at one unless the lead decides otherwise.
@@ -90,6 +90,7 @@ Migration (`supabase/migrations/<timestamp>_profiles.sql`, applied by the owner;
 ```sql
 create table public.profiles (
   id         uuid primary key references auth.users on delete cascade,
+  email      text,
   role       text not null default 'user' check (role in ('user', 'super_admin')),
   created_at timestamptz not null default now()
 );
@@ -112,7 +113,7 @@ language plpgsql
 security definer set search_path = ''
 as $$
 begin
-  insert into public.profiles (id) values (new.id);   -- role gets its default, 'user'
+  insert into public.profiles (id, email) values (new.id, new.email);  -- role gets its default, 'user'
   return new;
 end;
 $$;
@@ -122,7 +123,7 @@ create trigger on_auth_user_created
   for each row execute procedure public.handle_new_user();
 ```
 
-Why the role cannot change: `authenticated` has **no UPDATE privilege** on the table and there is **no UPDATE policy**, so Postgres refuses at the privilege check before RLS is even consulted. `anon` has no privileges at all. If editable profile fields are added later, grant column-level update on those columns only (`grant update (display_name) on public.profiles to authenticated;`) with an `update` policy whose `using` and `with check` are both `(select auth.uid()) = id`. **Never** grant update on `role`, and never grant table-wide update.
+Why the role cannot change: `authenticated` has **no UPDATE privilege** on the table and there is **no UPDATE policy** (D-007), so Postgres refuses at the privilege check before RLS is even consulted. `anon` has no privileges at all. If editable profile fields are added later (needs a new decision record), grant column-level update on those columns only (`grant update (display_name) on public.profiles to authenticated;`) with an `update` policy whose `using` and `with check` are both `(select auth.uid()) = id`, and add a `before update` trigger that raises if `new.role is distinct from old.role` and `current_user in ('anon', 'authenticated')` as a second lock. **Never** grant update on `role`, and never grant table-wide update.
 
 The trigger must **not** copy anything from `raw_user_meta_data` into `role`. Supabase's RLS guide notes user metadata "is not a good place to store authorization data".
 
@@ -149,7 +150,7 @@ Decision D-005: Contents read/write and Metadata read only, an expiry (about 90 
 
 ### R9. Path allow-list enforced at propose AND at approve (T2, T10, T11)
 
-`netlify/functions/_lib/allowlist.ts` is the single policy (`path-allowlist` skill; doc 04 §4.5.4). The `propose_change` tool handler validates every path, size and encoding; the `approve` Function **re-validates the stored proposal from scratch** before building the tree. Deny wins; any violation rejects the whole proposal. Tree entries are mode `100644` only.
+`netlify/functions/_lib/allowlist.ts` is the single policy (`path-allowlist` skill; doc 04 §4.5.4). Per D-007 the deny-list also covers the auth code and migrations: `supabase/**`, `login/**`, `src/lib/auth.*`. The `propose_change` tool handler validates every path, size and encoding; the `approve` Function **re-validates the stored proposal from scratch** before building the tree. Deny wins; any violation rejects the whole proposal. Tree entries are mode `100644` only.
 
 ### R10. CSRF defence in depth on every non-GET request (T8)
 
@@ -179,7 +180,7 @@ Every Agent Console Function requires `super_admin`: list agents, chat, start a 
 In Supabase Dashboard → Authentication → **URL Configuration**:
 
 - **Site URL** = the production origin, for example `https://beachday.netlify.app` (it is the default redirect for confirmation and reset emails).
-- **Redirect URLs** = exact paths only, for example `https://beachday.netlify.app/auth/callback` and `https://beachday.netlify.app/auth/reset`. Supabase recommends "setting the exact redirect URL path for your site URL in production". No `**` wildcards in the production project. `http://localhost:*` entries belong in a separate development Supabase project, not production.
+- **Redirect URLs** = exact paths only: `https://<site>/login/` (OAuth and email-confirmation return, D-006) and `https://<site>/login/reset/` (password recovery). Supabase recommends "setting the exact redirect URL path for your site URL in production". No `**` wildcards in the production project. `http://localhost:*` entries belong in a separate development Supabase project, not production.
 - Every `signInWithOAuth`, `signUp` (`emailRedirectTo`) and `resetPasswordForEmail` call passes an explicit `redirectTo` that is on this list.
 - Create the browser client with `auth: { flowType: 'pkce' }` so OAuth and email links return a one-time code, not tokens in the URL fragment.
 
@@ -188,7 +189,7 @@ In Supabase Dashboard → Authentication → **URL Configuration**:
 In Google Cloud Console → OAuth client (type "Web application"):
 
 - **Authorized JavaScript origins:** the production site origin only.
-- **Authorized redirect URIs:** only the Supabase callback, `https://<project-ref>.supabase.co/auth/v1/callback`. The site's own redirect (`/auth/callback`) is controlled by R13, not by Google.
+- **Authorized redirect URIs:** only the Supabase callback, `https://<project-ref>.supabase.co/auth/v1/callback`. The site's own return page (`/login/`) is controlled by R13, not by Google.
 - Scopes: `openid`, `email`, `profile` only.
 - The Google **client secret** is entered only in Supabase Dashboard → Authentication → Providers → Google. It never goes in Netlify, the repo or the browser.
 
@@ -196,13 +197,14 @@ In Google Cloud Console → OAuth client (type "Web application"):
 
 - **Confirm email: on** (the hosted default). Unconfirmed users cannot sign in, so nobody can pre-register the owner's address.
 - Minimum password length 12 in Auth settings; turn on leaked-password protection if the plan offers it.
-- Forgot password uses `resetPasswordForEmail(email, { redirectTo: '<site>/auth/reset' })`; the reset page calls `updateUser({ password })`. The UI always says "If that address has an account, we've sent a link", whether or not it exists.
+- Forgot password uses `resetPasswordForEmail(email, { redirectTo: '<site>/login/reset/' })`; after the `PASSWORD_RECOVERY` event the reset page calls `updateUser({ password })`. The UI always says "If that address has an account, we've sent a link", whether or not it exists.
 - Log out calls `supabase.auth.signOut()`. JWT expiry stays at the Supabase default (1 hour) or shorter; never longer.
+- The built-in Supabase email sender allows only a few emails per hour (D-006); configure custom SMTP before real sign-ups. The SMTP password lives only in the Supabase dashboard.
 - Recommend MFA (TOTP) for the owner account once the UI supports it (OPEN, §8).
 
 ### R16. Safe errors (T5, T13)
 
-- Clients get only `{ "error": "<generic message>" }`: 401 "Sign in required", 403 "Not allowed" or "Forbidden", 429 "Too many requests", 400 "Invalid request", 409 for stale proposals, 500 "Something went wrong".
+- Clients get only `{ "error": "<generic message>" }`: 401 "Sign in required", 403 "Not allowed" or "Forbidden", 429 "Too many requests", 400 "Invalid request", 409 for stale proposals, 503 "Sign-in service unavailable", 500 "Something went wrong".
 - Never echo upstream bodies (Supabase, Claude, GitHub), stack traces, tokens or headers. Logs are redacted: no `Authorization` header, no token, no key.
 - 401 and 403 responses look the same whether the user does not exist, the token expired, or the role is wrong (beyond the 401/403 split).
 
@@ -218,7 +220,7 @@ Netlify scopes: **Builds** (visible during `vite build`), **Functions** (visible
 |---|---|---|---|
 | `VITE_SUPABASE_URL` | Builds; all contexts | Public (inlined into the bundle) | Supabase project URL for the browser client |
 | `VITE_SUPABASE_PUBLISHABLE_KEY` | Builds; all contexts | Public by design (`sb_publishable_…`), safe only with R6 | Browser Supabase client |
-| `SUPABASE_URL` | Functions; all contexts | Public | Supabase project URL for the guard; also overridable in tests to point at a mock |
+| `SUPABASE_URL` | Functions; all contexts | Public | Supabase project URL for the guard. Must be `https://` except when `context.deploy.context === "dev"` (tests may point it at a local mock, D-008) |
 | `SUPABASE_PUBLISHABLE_KEY` | Functions; all contexts | Public | Guard's Supabase client (always combined with the caller's JWT) |
 | `ANTHROPIC_API_KEY` | Functions; Production (a separate low-limit key for previews and dev) | **Secret** | Claude API |
 | `GITHUB_TOKEN` | Functions; **Production only** | **Secret** | Fine-grained PAT (D-005) |
@@ -234,7 +236,7 @@ Test-only overrides (never set in Production): `GITHUB_API_URL`, `ANTHROPIC_BASE
 
 ## 5. The guard contract (`netlify/functions/_lib/auth.ts`)
 
-Every protected Function starts with `const g = await guard(req); if (!g.ok) return g.response;`. The guard runs these steps in this order and stops at the first failure:
+Every protected Function starts with `const g = await requireRole(req, ctx, "super_admin"); if (!g.ok) return g.response;` (name per D-008). It runs these steps in this order, with no caching between requests, and stops at the first failure:
 
 | Step | Check | On failure |
 |---|---|---|
@@ -242,12 +244,12 @@ Every protected Function starts with `const g = await guard(req); if (!g.ok) ret
 | 2 | Non-GET only: `Origin` === `new URL(req.url).origin`; `Sec-Fetch-Site`, if present, === `same-origin` | 403 `{error:"Forbidden"}` |
 | 3 | Non-GET only: `X-Requested-With` === `beachday` | 403 `{error:"Forbidden"}` |
 | 4 | `Authorization` matches `^Bearer ([A-Za-z0-9._-]+)$` and is at most 4096 characters | 401 `{error:"Sign in required"}` |
-| 5 | `createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, { global: { headers: { Authorization: "Bearer " + jwt } }, auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } })`, then `auth.getUser(jwt)` returns a user with no error | 401 `{error:"Sign in required"}` |
-| 6 | With the same client: `from("profiles").select("role").eq("id", user.id).single()` returns a row | 403 `{error:"Not allowed"}` |
-| 7 | `row.role === "super_admin"` | 403 `{error:"Not allowed"}` |
+| 5 | `createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, { global: { headers: { Authorization: "Bearer " + jwt } }, auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } })`, then `auth.getUser(jwt)` returns a user with no error (equivalent raw call: `GET {SUPABASE_URL}/auth/v1/user` with `apikey: <publishable key>` and the bearer token) | invalid or expired → 401 `{error:"Sign in required"}` |
+| 6 | With the same client: `from("profiles").select("id, role").eq("id", user.id)` returns exactly one row and `row.id === user.id` | 403 `{error:"Not allowed"}` |
+| 7 | `row.role === requiredRole` (`"super_admin"`) | 403 `{error:"Not allowed"}` |
 | 8 | Returns `{ ok: true, user: { id: user.id, email: user.email }, supabase }` | — |
 
-- Any thrown error inside steps 5–7 (network, timeout, malformed response) → 401 or 403, never 500 with details, never allow.
+- Supabase unreachable, timed out (set a 5 s timeout) or answering 5xx in steps 5–7 → **503** `{error:"Sign-in service unavailable"}` (fail closed, D-008). Never 500 with details, never allow.
 - Create the Supabase client **per request** (it carries this caller's JWT); never share one across requests.
 - Rate limiting (`config.rateLimit`) runs at the edge before the Function; budget checks run after the guard.
 - A worked, runnable version of this order is in `knowledge/security-engineer/examples/guard-request.mjs`.
@@ -286,11 +288,13 @@ Guard and Functions (each protected endpoint, using mocks or the test project):
 - [ ] F5 Body containing `role: "super_admin"` from a `user` → still 403.
 - [ ] F6 Demote the owner in SQL → the next request with the same, unexpired token → 403.
 - [ ] F7 POST without `X-Requested-With: beachday` → 403; with `Origin: https://evil.example` → 403; with `Sec-Fetch-Site: cross-site` → 403.
-- [ ] F8 Supabase unreachable (mock times out) → 401/403, never success, never a stack trace.
+- [ ] F8 Supabase unreachable or 5xx (mock) → 503, never success, never a stack trace.
+- [ ] F8b A non-`https://` `SUPABASE_URL` outside the `dev` context → every protected request refused.
+- [ ] F8c A token whose session was signed out (`signOut`) → 401 (Auth returns `session_not_found`).
 - [ ] F9 Error bodies contain only `{error}`; no upstream text, token or header.
 - [ ] F10 `agent-job` called directly without a valid HMAC → rejected, no work done.
 - [ ] F11 Rate limit: the 11th chat request in 60 s → 429. Daily budget exhausted → 429.
-- [ ] F12 Approve re-validates paths: a stored proposal edited to include `netlify.toml` is rejected at approve. Allow-list fuzz list (doc 05 §5.1) all rejected at propose and approve.
+- [ ] F12 Approve re-validates paths: a stored proposal edited to include `netlify.toml` or `supabase/migrations/x.sql` is rejected at approve. Allow-list fuzz list (doc 05 §5.1) all rejected at propose and approve.
 - [ ] F13 Double-click Approve → exactly one commit.
 - [ ] F14 Audit entries exist for chat, job, proposal, approve, reject and for 401/403 denials, with user id and no token.
 
@@ -298,10 +302,10 @@ Auth flows (Playwright, against a test Supabase project):
 
 - [ ] A1 Sign up → must confirm email before sign-in works.
 - [ ] A2 Log in, log out (`signOut`), and the Agents page then disappears and its APIs return 401.
-- [ ] A3 Forgot password: same message for existing and unknown emails; the link lands on `/auth/reset` and `updateUser({ password })` works.
-- [ ] A4 Continue with Google redirects to Google and back to `/auth/callback` (mock or manual check on staging).
+- [ ] A3 Forgot password: same message for existing and unknown emails; the link lands on `/login/reset/` and `updateUser({ password })` works.
+- [ ] A4 Continue with Google redirects to Google and back to `/login/` (mock or manual check on staging).
 - [ ] A5 A `redirectTo` not on the allow-list is not honoured (Supabase falls back to the Site URL).
-- [ ] A6 Signed-in `user` cannot see the Agents link; typing `/console` shows "Not allowed", and all data calls are 403.
+- [ ] A6 Signed-in `user` cannot see the Agents link; opening the Agents page directly shows "You don't have access", and all data calls are 403.
 
 Secrets and build:
 
@@ -323,7 +327,6 @@ Secrets and build:
 ## 8. Open items
 
 - CSP in `docs/03-architecture.md` §3.5 must add the Supabase project origin to `connect-src` (owner: netlify-engineer / software-architect).
-- A decision record is needed to supersede the password gate formally (owner: software-architect; Rook proposes "D-006 Supabase Auth with roles in `profiles`").
 - MFA for the `super_admin` account, and whether Functions should then also require the `aal2` assurance level.
 - Whether Netlify Deploy Previews get their own Supabase project (recommended) instead of preview URLs on the production allow-list.
 
@@ -336,6 +339,7 @@ Secrets and build:
 - Supabase JS reference, `getUser` / `getClaims`: https://supabase.com/docs/reference/javascript/auth-getuser · https://supabase.com/docs/reference/javascript/auth-getclaims
 - Supabase, Redirect URLs: https://supabase.com/docs/guides/auth/redirect-urls
 - Supabase, Password-based auth: https://supabase.com/docs/guides/auth/passwords
+- Supabase, Auth error codes (`session_not_found`): https://supabase.com/docs/guides/auth/debugging/error-codes
 - Supabase, Sign in with Google: https://supabase.com/docs/guides/auth/social-login/auth-google
 - OWASP CSRF Prevention Cheat Sheet: https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html
 - OWASP Secrets Management Cheat Sheet: https://cheatsheetseries.owasp.org/cheatsheets/Secrets_Management_Cheat_Sheet.html

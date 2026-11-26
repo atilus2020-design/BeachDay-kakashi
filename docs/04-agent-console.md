@@ -45,7 +45,7 @@ All four have a 1M-token context window and 128K max output.
 
 ## 4.2 Endpoints
 
-Sign up, log in, log out, forgot password and Continue with Google happen **in the browser with supabase-js against Supabase Auth**; there are no `/api/auth/*` Functions. Every endpoint below runs the guard in `docs/security.md` §5: the Supabase access token arrives as `Authorization: Bearer`, is verified server-side, and the role is read from `public.profiles` under RLS. "CSRF" means `X-Requested-With: beachday` plus the `Origin` / `Sec-Fetch-Site` check (security.md R10).
+Sign up, log in, log out, forgot password and Continue with Google happen **in the browser with supabase-js against Supabase Auth**; there are no `/api/auth/*` Functions. Every endpoint below runs `requireRole(req, ctx, "super_admin")` (`docs/security.md` §5, D-008): the Supabase access token arrives as `Authorization: Bearer`, is verified server-side, and the role is read from `public.profiles` under RLS. "CSRF" means `X-Requested-With: beachday` plus the `Origin` / `Sec-Fetch-Site` check (security.md R10).
 
 | Method and path | Function | Auth | Purpose |
 |---|---|---|---|
@@ -80,14 +80,14 @@ Facts from the Claude API docs:
 // netlify/functions/agent-chat.mts (sketch)
 import Anthropic from "@anthropic-ai/sdk";
 import type { Config, Context } from "@netlify/functions";
-import { guard } from "./_lib/auth.ts";              // docs/security.md §5
+import { requireRole } from "./_lib/auth.ts";        // docs/security.md §5, D-008
 import { getAgent } from "./_lib/agents.ts";          // server-side prompts and model IDs
 import { checkBudget, recordUsage } from "./_lib/budget.ts";
 
 const client = new Anthropic();                        // reads ANTHROPIC_API_KEY from env
 
 export default async (req: Request, ctx: Context) => {
-  const g = await guard(req);                          // Supabase token + super_admin; 401/403 otherwise
+  const g = await requireRole(req, ctx, "super_admin"); // 401 / 403 / 503 (fail closed)
   if (!g.ok) return g.response;
   const user = g.user;                                 // { id, email } from Supabase, never from the body
   const { agent: agentName, messages } = await req.json();
@@ -213,7 +213,7 @@ Also give the agent **read-only tools** so it proposes changes against real code
 
 ### 4.5.2 Sign-in and roles (Supabase Auth)
 
-> **Superseded:** the original shared-password gate (`CONSOLE_PASSWORD_HASH`, HMAC `bd_session` cookie with `SESSION_SECRET`, `/api/auth/login`) is replaced by Supabase Auth. Do not build it.
+> **Superseded (D-006):** the original shared-password gate (`CONSOLE_PASSWORD_HASH`, HMAC `bd_session` cookie with `SESSION_SECRET`, `/api/auth/login`) is replaced by Supabase Auth. Do not build it.
 
 - **Sign-in** is Supabase Auth in the browser: email and password (sign up with email confirmation, log in, log out, forgot password) and Continue with Google (`signInWithOAuth({ provider: 'google' })`). The browser client uses only `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY`.
 - **Roles** live in `public.profiles` (`role` default `'user'`), created by a trigger on `auth.users`. RLS lets a user read only their own row; nobody can update `role` through the API. The owner assigns `super_admin` by hand in the Supabase SQL editor.
@@ -360,5 +360,5 @@ Never set `SUPABASE_SECRET_KEY` or `SUPABASE_SERVICE_ROLE_KEY`. The full table w
 - **Decided (D-003):** commit directly to `main`.
 - **Decided (D-005):** a fine-grained personal access token for this repository only, with Contents read/write and Metadata read.
 - Should agents get a `run_tests` tool? Not inside Netlify Functions: there is no repository checkout or toolchain. If wanted, have the approve step open a pull request and let GitHub Actions run tests. That needs a separate, human-managed workflow, not one written by agents.
-- **Decided (lead, 2026-11-26; decision record pending):** Supabase Auth (email and password plus Google) with roles in `public.profiles`; only `super_admin` uses the Console. See `docs/security.md`.
+- **Decided (D-006, D-007, D-008):** Supabase Auth (email and password plus Google) with roles in `public.profiles`; only `super_admin` uses the Console. See `docs/security.md`.
 - MFA for the `super_admin` account: recommended, not yet decided.

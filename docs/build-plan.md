@@ -1,0 +1,364 @@
+# Build plan
+
+Owner: software-architect (Ines) · Reviewer: orchestrator · Date: 2026-11-26
+
+This plan covers how the expert team builds the whole app, in waves. Each expert runs in parallel with the others in its wave. A task waits only for a **true dependency**, marked **⛓ needs**. Everything else starts as soon as its wave starts. The contracts in §3 are fixed **before** Wave 1, so the front end, the Functions and the tests can be written at the same time.
+
+Constraints: D-001 (static front end + Netlify Functions + Blobs, no servers of our own), D-002 (no rip proxy), D-003 (Approve → `main`), D-004 (Netlify Free), D-005 (fine-grained token), D-006 (Supabase Auth), D-007 (`profiles` + RLS, `super_admin` only), D-008 (URL + publishable key only, token and role checked in every Function).
+
+## 1. What we are building
+
+| Area | Pages / endpoints | Summary |
+|---|---|---|
+| Beach Day | `/` | Pick a South Florida beach. See today's score, best window, reasons, the week ahead and the NWS rip-current link (D-002). Works offline from the last forecast |
+| PWA | manifest, `sw.js`, `offline.html` | Installable on iPhone and Android, with the offline shell and the "New version, reload" prompt (doc 02) |
+| Login | `/login/` | Supabase email + password (sign up, log in, log out, forgot password and set a new password) and Continue with Google (D-006) |
+| Agents page | `/agents/` | `super_admin` only (D-007): agent grid, chat (SSE), proposals list, proposal diff, Approve and deploy, Reject |
+| How it works | `/how-it-works/` | How the score works, what the app does **not** do, how agents propose and humans approve |
+| Resources | `/resources/` | Every external link: Open-Meteo docs + terms, Netlify, Claude API, GitHub REST, Supabase, MDN PWA, Apple HIG, WCAG, NWS rip pages, the repo, https://mcp-api.netlify.app/ and `/guide/` |
+| Guide | `/guide/` | A step-by-step guide to set up and deploy your own copy |
+| Config | `netlify.toml`, `README.md` | Build, headers/CSP, Functions; the README covers setup, environment variables, Supabase + Google setup, tests and secret rotation |
+
+**Not in v1:** background jobs (`/api/jobs`, doc 04 §4.7). Chat with tool calls and `propose_change` fits in one streamed turn under 60 s. Jobs can be added later under a new decision record (see D-008 consequences).
+
+## 2. System diagram
+
+```
+ Browser (PWA)                                Netlify                                         External (managed)
+ ─────────────                                ───────                                         ──────────────────
+ /, /how-it-works/, /resources/, /guide/  ─▶  CDN static (dist/)
+ /login/, /agents/  (static shells)       ─▶  CDN static, /agents/* no-store + noindex
+ src/lib/auth.ts (supabase-js) ───────────────── HTTPS (publishable key) ──────────────────▶  Supabase Auth  (sign up / in / out,
+                                                                                                reset, Google OAuth → accounts.google.com)
+ src/lib/auth.ts → profiles (own row, RLS) ──────────────────────────────────────────────▶  Supabase Postgres (profiles)
+
+ GET  /api/forecast?beach=id   (public)   ─▶  fn forecast ──── CDN-cached ──────────────▶  api.open-meteo.com, marine-api.open-meteo.com
+ Bearer <access token> on every call below:
+ GET  /api/agents                         ─▶  fn agents      ┐
+ POST /api/agent/chat (SSE)               ─▶  fn agent-chat  │  _lib/auth.requireRole("super_admin")
+ GET  /api/proposals[/:id]                ─▶  fn proposals   │    1. GET {SUPABASE_URL}/auth/v1/user          ─▶ Supabase Auth
+ POST /api/proposals/:id/reject           ─▶  fn proposals   │    2. GET {SUPABASE_URL}/rest/v1/profiles (RLS) ─▶ Supabase Postgres
+ POST /api/proposals/:id/approve          ─▶  fn approve     ┘    3. role === "super_admin" else 403
+                                                agent-chat ─────────────────────────────▶  api.anthropic.com
+                                                proposals, budgets, audit ─▶ Netlify Blobs
+                                                approve ────────────────────────────────▶  api.github.com (one commit to main)
+                                                                                                   │
+                                              Netlify Git deploy ◀──────────────────────────────────┘
+```
+
+## 3. Contracts
+
+### 3.1 Common rules for every protected endpoint
+
+| Item | Rule |
+|---|---|
+| Auth | `Authorization: Bearer <Supabase access token>`; `_lib/auth.requireRole(req, ctx, "super_admin")` runs first, **every request** (D-008) |
+| CSRF (POST only) | `X-Requested-With: beachday` **and** `Origin` equal to the site URL (`context.site.url`, or `http://localhost:8888` in dev) → else 403 |
+| Content type | Requests `application/json`; responses `application/json` (or `text/event-stream` for chat); always `Cache-Control: no-store` |
+| Error body | `{ "error": "<short message>" }`; never upstream bodies, stack traces or tokens |
+| Status codes | 400 invalid input · 401 missing/invalid/expired token · 403 not `super_admin` or CSRF failed · 404 not found · 409 conflict · 413 too large · 429 rate limited · 503 Supabase/GitHub unavailable or not configured (fail closed) |
+| Client behaviour | On 401: call `supabase.auth.refreshSession()` once and retry; if it is still 401, go to `/login/?next=<path>`. On 403: show "You don't have access". On 503: show "Sign-in service unavailable, try again later" |
+
+### 3.2 Endpoints
+
+| Method + path | Function | Auth | Request | Response 200 | Errors | Rate limit (per IP) |
+|---|---|---|---|---|---|---|
+| `GET /api/forecast?beach=<id>` | `forecast.mts` | **Public** | `beach` = an `id` from `src/data/beaches.json` | `ForecastResponse` | 400 missing, 404 unknown beach, 502 both upstreams failed | 60 / 60 s |
+| `GET /api/agents` | `agents.mts` | super_admin | — | `{ "agents": AgentSummary[] }` | 401, 403, 503 | 30 / 60 s |
+| `POST /api/agent/chat` | `agent-chat.mts` (streaming) | super_admin + CSRF | `ChatRequest` (≤ 30 messages, ≤ 100 KB) | `text/event-stream`, see §3.4 | 400, 401, 403, 404 unknown agent, 413, 429 budget, 503 | 10 / 60 s |
+| `GET /api/proposals?status=pending\|approved\|rejected\|all` | `proposals.mts` | super_admin | default `pending` | `{ "proposals": ProposalSummary[] }` (newest first, ≤ 50) | 400, 401, 403, 503 | 30 / 60 s |
+| `GET /api/proposals/:id` | `proposals.mts` | super_admin | — | `Proposal` | 401, 403, 404, 503 | 30 / 60 s |
+| `POST /api/proposals/:id/approve` | `approve.mts` | super_admin + CSRF + title confirm | `{ "confirmTitle": "<exact proposal title>" }` | `{ "status": "approved", "commit": { "sha": "…", "url": "…" }, "deploy": "started" }` | 400 title mismatch, 401, 403, 404, 409 stale or already decided, 422 path re-check failed, 503 approve disabled (no `GITHUB_TOKEN`, e.g. Deploy Previews) | 5 / 60 s |
+| `POST /api/proposals/:id/reject` | `proposals.mts` | super_admin + CSRF | `{ "reason"?: string ≤ 500 }` | `{ "status": "rejected" }` | 401, 403, 404, 409 already decided | 10 / 60 s |
+
+`proposals.mts` uses `config.path: ["/api/proposals", "/api/proposals/:id", "/api/proposals/:id/reject"]`. `approve.mts` is separate so it can have its own rate limit and its own review.
+
+There are no `/api/auth/*` endpoints (D-006). Sign-in talks straight to Supabase from the browser. The front end reads its own role with `supabase.from("profiles").select("role").single()`, which RLS limits to the person's own row. That read only decides what the UI shows. The Functions enforce access.
+
+### 3.3 JSON shapes (TypeScript, to live in `src/shared/contracts.ts`)
+
+```ts
+export type Role = "user" | "super_admin";
+
+export interface Beach { id: string; name: string; city: string; county: string; lat: number; lon: number; nwsOffice: string; coast?: "atlantic" | "gulf" }
+export interface ForecastResponse {
+  beach: Beach;
+  forecast: unknown | null;        // Open-Meteo Forecast JSON as returned (doc 01 §1.2)
+  marine: unknown | null;          // Open-Meteo Marine JSON as returned; null if it failed
+  partial: boolean;                // true when one of the two is null
+  fetchedAt: string;               // ISO 8601
+}
+// Scoring runs in the browser: scoreWeek({ forecast, marine }) → DayScore[] (doc 01 §1.3)
+
+export interface AgentSummary {
+  name: string;                    // "open-meteo-integrator"
+  displayName: string;             // "Kai"
+  description: string;
+  model: string;                   // "claude-sonnet-5-5" (resolved API model ID)
+  modelAlias: "opus" | "sonnet" | "haiku" | "custom";
+  personality: string;             // short excerpt, plain text
+  color?: string;
+}
+
+export interface ChatMessage { role: "user" | "assistant"; content: string }
+export interface ChatRequest { agent: string; messages: ChatMessage[] }
+
+export type ProposalStatus = "pending" | "approved" | "rejected";
+export interface Actor { id: string; email: string | null }   // Supabase user id + email
+export interface ProposalSummary {
+  id: string; agent: string; title: string; status: ProposalStatus;
+  fileCount: number; createdAt: string; createdBy: Actor;
+}
+export interface Proposal extends ProposalSummary {
+  summary: string;
+  baseSha: string;
+  files: { path: string; action: "create" | "update" | "delete" }[];
+  diff: string;                    // unified diff, rendered with textContent only
+  decidedAt?: string; decidedBy?: Actor; rejectReason?: string;
+  commit?: { sha: string; url: string };
+}
+export interface ApiError { error: string }
+```
+
+### 3.4 Chat stream (`POST /api/agent/chat`)
+
+Validation errors (400/401/403/404/413/429/503) come back as normal JSON before the stream starts. After a 200, events arrive in this order:
+
+```
+event: text      data: "<text chunk>"                         (0..n)
+event: tool      data: {"name":"read_file","path":"src/…"}     (0..n, shown as a collapsible row)
+event: proposal  data: {"id":"p_…","title":"…"}                (0..1, links to /agents/#proposal/<id>)
+event: done      data: {"stop_reason":"end_turn"}              (exactly one of done | error, last)
+event: error     data: {"message":"Agent unavailable, please retry."}
+```
+
+The turn must end in under 60 s (bounded `max_tokens`, `effort: "low"`, at most a few tool rounds). The transcript stays in the browser's `sessionStorage` (doc 04 §4.3).
+
+### 3.5 Module contracts (the seams between experts)
+
+| Module | Owner | Exports |
+|---|---|---|
+| `netlify/functions/_lib/auth.ts` | supabase-auth-engineer | `type AuthedUser = { id: string; email: string \| null; role: Role }` · `requireUser(req, ctx): Promise<AuthedUser>` (401/503) · `requireRole(req, ctx, role: "super_admin"): Promise<AuthedUser>` (401/403/503) · `assertCsrf(req, ctx): void` (403) · `class HttpError { status: number; message: string }` · `errorResponse(e): Response` |
+| `src/lib/auth.ts` | supabase-auth-engineer | `supabase` (client from `VITE_SUPABASE_URL` + `VITE_SUPABASE_PUBLISHABLE_KEY`, `flowType: "pkce"`) · `signUp(email, pw)` · `signIn(email, pw)` · `signInWithGoogle(next?)` · `signOut()` · `sendPasswordReset(email)` · `updatePassword(pw)` · `getAccessToken(): Promise<string \| null>` · `getRole(): Promise<Role \| null>` · `onAuthChange(cb)` · `requireSuperAdmin(next): Promise<"ok" \| "forbidden">` (redirects to `/login/?next=` when signed out) |
+| `src/lib/api.ts` | frontend-engineer | `apiGet<T>(path)`, `apiPost<T>(path, body)`: add the bearer token from `getAccessToken()` and the `X-Requested-With` header, time out after 15 s, retry once on 401 after a refresh, and throw `{ status, error }` |
+| `src/lib/sse.ts` | frontend-engineer | `readSse(res, onEvent: (event, data) => void): Promise<void>` |
+| `src/scoring/score.ts` | open-meteo-integrator | `scoreWeek(input): DayScore[]` (doc 01 §1.3), with no I/O |
+| `netlify/functions/_lib/allowlist.ts` | security-engineer | `assertWritablePath(p): string`, `assertProposalLimits(files)` |
+| `netlify/functions/_lib/{claude,github,diff,agents,blobs,budget,audit}.ts` | agent-console-engineer | Claude client wrapper (injectable for tests), Git Data API commit, diff builder, agent registry, Blobs helpers, daily budget, audit append |
+
+**`next` parameter:** `/login/?next=/agents/` accepts only same-origin paths that start with `/` and not `//`. Anything else goes to `/`.
+
+**Page bundles:** only `login/` and `agents/` import `src/lib/auth.ts` (supabase-js). The home page keeps its < 150 KB JS budget and shows a plain "Sign in" link.
+
+### 3.6 Supabase schema (contract; the migration is written by supabase-auth-engineer)
+
+`supabase/migrations/20261126000000_profiles.sql` must produce:
+
+- `public.profiles(id uuid pk → auth.users(id) on delete cascade, email text, role text not null default 'user' check (role in ('user','super_admin')), created_at timestamptz not null default now())`.
+- `alter table public.profiles enable row level security;` with **one** policy: `for select to authenticated using ((select auth.uid()) = id)`.
+- `revoke insert, update, delete on public.profiles from anon, authenticated;` and no write policies.
+- Function `public.handle_new_user()` (`security definer`, `set search_path = ''`) and trigger `on_auth_user_created after insert on auth.users`, which inserts `(id, email)`.
+- A comment block at the end with the manual promotion SQL: `update public.profiles set role = 'super_admin' where email = '<owner email>';`.
+
+### 3.7 Environment variables
+
+| Name | Where (Netlify UI → Site configuration → Environment variables) | Secret? | Example format |
+|---|---|---|---|
+| `ANTHROPIC_API_KEY` | Functions; all contexts (low-limit key for previews/dev) | **Yes** | `sk-ant-…` |
+| `GITHUB_TOKEN` | Functions; **Production only** | **Yes** | `github_pat_…` |
+| `GITHUB_REPO` | Functions | No | `owner/name` |
+| `SUPABASE_URL` | Functions | No | `https://<ref>.supabase.co` |
+| `SUPABASE_PUBLISHABLE_KEY` | Functions | No (public by design) | `sb_publishable_…` |
+| `VITE_SUPABASE_URL` | Builds | No | `https://<ref>.supabase.co` |
+| `VITE_SUPABASE_PUBLISHABLE_KEY` | Builds | No | `sb_publishable_…` |
+| `DAILY_CHAT_LIMIT` | Functions | No | `200` |
+| `OPEN_METEO_BASE`, `ANTHROPIC_BASE_URL`, `GITHUB_API_URL` | **Local/test only**; unset in production | No | `http://127.0.0.1:9100/open-meteo` |
+
+**Never present anywhere:** a Supabase secret key (`sb_secret_…`), the `service_role` key, the Supabase JWT secret, `CONSOLE_PASSWORD_HASH` or `SESSION_SECRET` (D-006, D-008). `scripts/check-secrets.mjs` fails the build if `dist/` contains `sk-ant-`, `github_pat_`, `sb_secret_`, `service_role`, `ANTHROPIC_API_KEY` or `GITHUB_TOKEN`.
+
+## 4. Waves
+
+Legend: **∥** = runs in parallel with every other task in the wave. **⛓ needs** = a true dependency (waits for that output). Reviews in each wave also run in parallel.
+
+### Wave 0 — plan and team (now)
+
+| Expert | Task | Output |
+|---|---|---|
+| software-architect ∥ | This plan, D-006…D-008, doc 03 update | `docs/build-plan.md`, `docs/decisions.md`, `docs/03-architecture.md`, `docs/README.md` |
+| security-engineer ∥ | Threat model for Supabase Auth and roles; update doc 04 §4.5 | `docs/security.md`, `docs/04-agent-console.md` |
+| agent-builder ∥ | Add `supabase-auth-engineer` (agent, skill, knowledge); update roster and ownership map | `.claude/agents/supabase-auth-engineer.md`, `.claude/skills/supabase-auth/…`, `knowledge/supabase-auth-engineer/…`, `docs/expert-roster.md`, `docs/agent-brains.md` |
+| **Human (lead), any time before Wave 4** | Create the Supabase project, the Google OAuth client and the Netlify site (not needed to build or test, because tests use mocks) | — |
+
+Reviews: orchestrator reviews the plan; security-engineer reviews D-006…D-008; software-architect reviews `docs/security.md` for consistency with the contracts.
+
+### Wave 1 — foundations (all ∥, inputs = Wave 0 packets)
+
+| Expert | Task | Inputs (handoff packets) | Outputs | Peer reviewer(s) |
+|---|---|---|---|---|
+| ux-designer-apple-hig | Flows, states and copy for every screen: home (picker, today, week, day detail, stale banner, install prompt), login (sign up, log in, Google, forgot, set new password, errors), Agents (no access, grid, chat, proposals, diff, approve confirm, reject), How it works, Resources | This plan §1, §3.1 client behaviour; doc 01, 02, 05 | `docs/ux/flows.md`, `docs/ux/copy.md` | ui-designer |
+| ui-designer-apple-liquid-glass | Liquid Glass tokens, materials, type, light/dark themes and a token name list | This plan §1; doc 05 contrast rules | `src/styles/tokens.css`, `src/styles/materials.css`, `src/styles/base.css`, `docs/ux/visual.md` | ux-designer |
+| open-meteo-integrator | Pure scoring module, beach list, forecast Function with `OPEN_METEO_BASE` override and `partial` handling | Contract §3.2–3.3 `ForecastResponse`; doc 01 | `src/scoring/*.ts`, `src/data/beaches.json`, `netlify/functions/forecast.mts` | qa-engineer |
+| supabase-auth-engineer | Migration; browser auth module; Function auth module (token + role check, CSRF, fail closed, https-only outside dev) | D-006…D-008; contracts §3.5–3.6; `docs/security.md` | `supabase/migrations/20261126000000_profiles.sql`, `src/lib/auth.ts`, `netlify/functions/_lib/auth.ts` | **security-engineer** |
+| agent-console-engineer | Agent manifest build script; Claude/GitHub/diff/Blobs/budget/audit libs; `agents`, `agent-chat`, `proposals`, `approve` Functions written against the `_lib/auth.ts` **interface** (§3.5) | Contracts §3.1–3.5; doc 04 §4.3–4.6; D-003, D-005, D-008 | `scripts/build-agents.mjs`, `netlify/functions/{agents,agent-chat,proposals,approve}.mts`, `netlify/functions/_lib/{claude,github,diff,agents,blobs,budget,audit}.ts` | **security-engineer** |
+| security-engineer | Allow-list with the new deny entries (`supabase/**`, `login/**`, `src/lib/auth.*`); final CSP values | D-007; path-allowlist skill | `netlify/functions/_lib/allowlist.ts` | agent-console-engineer |
+| netlify-engineer | Build config, CSP with the Supabase origin, `/agents/*` no-store, Vite multi-page config, secret scan, `.env.example` | §3.7; netlify-deploy-config skill | `netlify.toml`, `package.json`, `vite.config.ts`, `tsconfig.json`, `.env.example`, `scripts/check-secrets.mjs` | security-engineer |
+| pwa-mobile-engineer | Manifest, icons, service worker (precache shell; network-first `/api/forecast`; **never cache** `/api/agent*`, `/api/proposals*`, any request with `Authorization`, or any Supabase origin), offline page, install prompt module | Doc 02; §3.2 | `public/manifest.webmanifest`, `public/icons/**`, `public/offline.html`, `src/sw.ts`, `src/pwa/{register,install}.ts` | qa-engineer, frontend-engineer |
+| qa-engineer | Test harness, upstream mock server, fixtures, and unit + function tests written **from the contracts** (they go green as code lands) | Contracts §3; doc 05; §7 of this plan | `vitest.config.ts`, `playwright.config.ts`, `tests/mocks/upstreams.mjs`, `tests/mocks/test.env`, `tests/fixtures/{open-meteo,anthropic,github,supabase}/**`, `tests/unit/**`, `tests/function/**` | open-meteo-integrator, agent-console-engineer, supabase-auth-engineer (each for their area) |
+| technical-writer | Content pages written against the page-shell contract (`<main>` content plus `<script type="module" src="/src/pages/content.ts">`) | Doc 01 §1.6, D-002, skill docs-writing link list | `how-it-works/index.html`, `resources/index.html`, `guide/index.html` | software-architect |
+| software-architect | Shared contract types (types only, no logic) | §3.3 | `src/shared/contracts.ts` | agent-console-engineer, frontend-engineer |
+
+No Wave 1 task waits for another. The Functions code against `_lib/auth.ts` by its signature. The writer codes against the shell contract. QA codes against the JSON shapes.
+
+### Wave 2 — screens and integration (all ∥)
+
+| Expert | Task | ⛓ needs | Outputs | Peer reviewer(s) |
+|---|---|---|---|---|
+| frontend-engineer | Home page (picker, today, week, day detail, stale banner, NWS link, attribution); Agents page (access check, grid, chat with SSE, proposals list, diff view with +/− text markers, Approve dialog with title confirm, Reject); shared shell/nav; API + SSE helpers | ⛓ UX flows + copy, ⛓ tokens (W1); ⛓ `src/lib/auth.ts` (W1, Agents page only); ⛓ `src/scoring` (W1) | `index.html`, `agents/index.html`, `src/pages/{home,agents,content}.ts`, `src/lib/{api,sse,dom,shell}.ts` | ux-designer, ui-designer; security-engineer (Agents page: token handling, no `innerHTML`) |
+| supabase-auth-engineer | Login page: sign up, log in, Google, forgot password, set new password (`PASSWORD_RECOVERY`), sign out, safe `next` redirect | ⛓ UX login flow + copy, ⛓ tokens (W1) | `login/index.html`, `src/pages/login.ts` | **security-engineer**, ux-designer |
+| agent-console-engineer | Integrate the real `_lib/auth.ts` and `_lib/allowlist.ts`; make the function tests pass | ⛓ `_lib/auth.ts`, `_lib/allowlist.ts`, QA function tests (W1) | Fixes in its W1 files | **security-engineer** |
+| pwa-mobile-engineer | Register the SW from page entries; wire the precache list to the Vite build output; place the install prompt | ⛓ page entries from frontend (this wave, small hand-off at the end) | `src/pwa/*`, `src/sw.ts` | qa-engineer |
+| qa-engineer | Playwright e2e specs (§7) against the mock server | ⛓ UX flows (W1) for selectors and copy | `tests/e2e/**` | frontend-engineer, supabase-auth-engineer |
+
+### Wave 3 — prove it, document it (all ∥)
+
+| Expert | Task | ⛓ needs | Outputs | Peer reviewer(s) |
+|---|---|---|---|---|
+| qa-engineer | Run everything: unit, function, e2e on iPhone/Pixel/desktop, offline, axe, 375 px, Approve vs mock GitHub, role checks, secret scan; file findings | ⛓ Wave 2 code | Test report in handoff; test fixes | owners of failing code |
+| security-engineer | Full security review: every protected Function calls `requireRole` first; CSRF; no secret keys; RLS migration; allow-list; CSP; SW never caches auth traffic | ⛓ Wave 2 code | Review verdicts | — |
+| technical-writer | `README.md`: what it is, run locally (with mocks), deploy to Netlify, environment variables (§3.7), Supabase + Google setup, making the first `super_admin`, tests, rotating secrets, Supabase Free pausing + 2 emails/hour note | ⛓ final env list (netlify-engineer W1), ⛓ setup steps from supabase-auth-engineer (W1/W2 packets) | `README.md` | software-architect, netlify-engineer |
+| software-architect | Check the tree and contracts against what was built; update this plan and doc 03 if anything drifted | ⛓ Wave 2 code | Doc updates | orchestrator |
+
+**Fix wave:** findings go back to their owners in parallel. Only the changed files are re-reviewed.
+
+### Wave 4 — deploy (orchestrator + netlify-engineer + human)
+
+1. Human: in Supabase, run the migration, set Site URL and redirect URLs (`https://<site>/login/`, `http://localhost:8888/login/`), enable Google with its client ID/secret (stored in the Supabase dashboard, not here), set the JWT expiry, and optionally set up custom SMTP.
+2. Human: set the Netlify environment variables (§3.7) in the UI.
+3. Orchestrator commits and pushes after all reviews pass, and Netlify builds.
+4. Human: sign up on the live site, then run the promotion SQL (§3.6) to become `super_admin`.
+5. Smoke test: `/api/forecast?beach=south-beach` returns 200; as a `user`, `/agents/` shows "no access" and `GET /api/agents` returns 403; as `super_admin`, chat works and a test proposal can be rejected.
+
+### Dependency summary (true dependencies only)
+
+```
+W0 plan/contracts ─┬─▶ W1 (11 tasks in parallel)
+                   │
+UX flows + tokens ─┼─▶ W2 frontend screens, W2 login page, W2 e2e specs
+src/lib/auth.ts ───┼─▶ W2 Agents page, W2 login page
+_lib/auth.ts + allowlist + QA function tests ─▶ W2 console integration
+page entries (W2 frontend) ─▶ W2 SW precache wiring
+W2 code ─▶ W3 QA run, security review, README ─▶ fix wave ─▶ W4 deploy
+```
+
+## 5. Final file tree
+
+```
+/
+├─ index.html                        # Beach Day home                         frontend-engineer
+├─ agents/index.html                 # Agents page (super_admin)              frontend-engineer
+├─ login/index.html                  # Supabase login                         supabase-auth-engineer
+├─ how-it-works/index.html           #                                        technical-writer
+├─ resources/index.html              # all external links                     technical-writer
+├─ guide/index.html                  # step-by-step setup guide               technical-writer
+├─ netlify.toml                      # build, functions, headers/CSP          netlify-engineer
+├─ package.json, package-lock.json   #                                        netlify-engineer
+├─ vite.config.ts, tsconfig.json     #                                        netlify-engineer
+├─ vitest.config.ts, playwright.config.ts                                     qa-engineer
+├─ .env.example                      # names + fake formats only              netlify-engineer
+├─ README.md                         #                                        technical-writer
+├─ public/
+│  ├─ manifest.webmanifest           #                                        pwa-mobile-engineer
+│  ├─ icons/…                        #                                        pwa-mobile-engineer
+│  ├─ offline.html                   #                                        pwa-mobile-engineer
+│  └─ robots.txt
+├─ src/
+│  ├─ pages/home.ts, agents.ts, content.ts                                    frontend-engineer
+│  ├─ pages/login.ts                                                          supabase-auth-engineer
+│  ├─ lib/api.ts, sse.ts, dom.ts, shell.ts                                    frontend-engineer
+│  ├─ lib/auth.ts                    # supabase-js client + helpers           supabase-auth-engineer
+│  ├─ pwa/register.ts, install.ts                                             pwa-mobile-engineer
+│  ├─ sw.ts                          # built to dist/sw.js                    pwa-mobile-engineer
+│  ├─ scoring/score.ts, window.ts, units.ts                                   open-meteo-integrator
+│  ├─ shared/contracts.ts            # types only                             software-architect
+│  ├─ data/beaches.json                                                       open-meteo-integrator
+│  └─ styles/tokens.css, materials.css, base.css                              ui-designer-apple-liquid-glass
+├─ netlify/functions/
+│  ├─ forecast.mts                   # public                                 open-meteo-integrator
+│  ├─ agents.mts, agent-chat.mts, proposals.mts, approve.mts                  agent-console-engineer
+│  ├─ _lib/auth.ts                   # requireRole, assertCsrf                supabase-auth-engineer
+│  ├─ _lib/allowlist.ts                                                       security-engineer
+│  ├─ _lib/claude.ts, github.ts, diff.ts, agents.ts, blobs.ts, budget.ts, audit.ts   agent-console-engineer
+│  └─ _generated/agents-private.json # build output, git-ignored             (scripts/build-agents.mjs)
+├─ supabase/
+│  └─ migrations/20261126000000_profiles.sql                                  supabase-auth-engineer
+├─ scripts/build-agents.mjs                                                   agent-console-engineer
+├─ scripts/check-secrets.mjs                                                  netlify-engineer
+├─ tests/
+│  ├─ unit/**, function/**, e2e/**                                            qa-engineer
+│  ├─ fixtures/open-meteo/**, anthropic/**, github/**, supabase/**            qa-engineer
+│  └─ mocks/upstreams.mjs, test.env                                           qa-engineer
+├─ docs/
+│  ├─ ux/flows.md, copy.md, visual.md                                         ux / ui designers
+│  └─ 01…05, decisions.md, build-plan.md, security.md, …
+├─ .claude/agents/**, .claude/skills/**, knowledge/**, CLAUDE.md              agent-builder
+```
+
+**Removed relative to doc 03's first layout:** `netlify/functions/auth.mts`, `_lib/session.ts`, `agent-job.mts`, `job-status.mts` (deferred), `src/console/` (now the `agents/` page) and the static `dist/agents.json` (D-007).
+
+## 6. Blobs stores
+
+| Store | Keys | Consistency |
+|---|---|---|
+| `proposals` | `proposal/<id>` (`createdBy`/`decidedBy` = Supabase user id + email) | strong; `onlyIfNew` on create, `onlyIfMatch` on decide |
+| `budget` | `chat/<yyyy-mm-dd>` counters | strong |
+| `audit` | `audit/<yyyy-mm-dd>/<ts>-<id>` → `{ t, userId, email, action, target, ip, requestId }` | default |
+| `locks` | `approve` (serializes approvals) | strong |
+
+The old `auth` store (`login-fail/<ip>`) is gone. Supabase rate-limits logins (D-006).
+
+## 7. Testing locally without real secrets
+
+Goal: every unit, function and e2e test runs with **no real key, token or Supabase project**. QA owns this harness.
+
+**Mock server:** `tests/mocks/upstreams.mjs` is one dependency-free Node `http` server on `127.0.0.1:9100`, with one path prefix per upstream. It serves recorded fixtures from `tests/fixtures/<upstream>/` and records every request it receives, so tests can assert on them (`GET /__requests`, `POST /__reset`).
+
+| Upstream | Env var pointing at the mock | Mock behaviour |
+|---|---|---|
+| Open-Meteo | `OPEN_METEO_BASE=http://127.0.0.1:9100/open-meteo` (overrides both the forecast and the marine host) | `/v1/forecast`, `/v1/marine` serve fixtures (calm day, thunderstorm, front, big swell, marine 500 for `partial`) |
+| Anthropic | `ANTHROPIC_BASE_URL=http://127.0.0.1:9100/anthropic` (the SDK reads it) | `/v1/messages` streams scripted SSE: text chunks → optional `tool_use propose_change` → `end_turn`; can also return 429 or `overloaded_error` |
+| GitHub | `GITHUB_API_URL=http://127.0.0.1:9100/github` | Git Data API: ref, commit, trees, commits, ref PATCH; can return a moved HEAD (409 path) or a non-fast-forward |
+| Supabase | `SUPABASE_URL=http://127.0.0.1:9100/supabase` | `/auth/v1/user`: `Bearer tok_super_admin` → admin user, `tok_user` → normal user, `tok_expired` → 401, anything else → 401. `/rest/v1/profiles` returns the matching row (RLS imitated). Switch `/__mode supabase-down` → 503 |
+
+**Fake values** in `tests/mocks/test.env` (committed; deliberately unlike real formats so the secret scan stays clean): `ANTHROPIC_API_KEY=test-anthropic-key`, `GITHUB_TOKEN=test-github-token`, `GITHUB_REPO=test-owner/test-repo`, `SUPABASE_PUBLISHABLE_KEY=test-publishable-key`.
+
+**Browser side (Playwright):** `page.route("https://beachday-test.supabase.co/**", …)` fulfils supabase-js calls (`/auth/v1/token?grant_type=password` returns a session whose `access_token` is `tok_super_admin` or `tok_user`; `/auth/v1/recover`, `/auth/v1/signup`, `/rest/v1/profiles`). The test build uses `VITE_SUPABASE_URL=https://beachday-test.supabase.co`. The token the browser gets is the same one the Function-side mock accepts, so the full path is exercised: login → Bearer → `_lib/auth` → mock Supabase → role. Google OAuth is tested only up to the redirect (assert that the `authorize?provider=google` navigation is requested). The real Google round trip is a manual check.
+
+**Running:** Playwright `webServer` is an array: the mock server, then `netlify dev` with `tests/mocks/test.env` loaded. Function tests (Vitest) call the handlers directly with `fetch` pointed at the mock and an in-memory Blobs fake.
+
+**Must-have auth tests:**
+
+- Every protected route returns 401 with no token, a junk token or `tok_expired`.
+- It returns 403 with `tok_user`.
+- It returns 503 when the Supabase mock is down, and never 200.
+- POST without `X-Requested-With`, or with a foreign `Origin`, returns 403.
+- `GET /api/forecast` works with no token.
+- A non-https `SUPABASE_URL` is rejected outside `dev`.
+- The Agents page shows "no access" for `tok_user`.
+- Approve as admin sends tree → commit → ref PATCH to the GitHub mock exactly once, even with a double click.
+- The secret scan fails on a planted `sb_secret_` string.
+- The RLS migration is reviewed by hand (security-engineer) and checked in the live project by the owner with a non-admin account. The test environment has no Postgres, which is an open item (see §8).
+
+## 8. Risks
+
+| Risk | Likelihood | Impact | Mitigation | Owner |
+|---|---|---|---|---|
+| Supabase Free project pauses after a week of low activity, so login and the Agents page fail | High | Medium (public pages unaffected) | Functions fail closed with 503 and a clear message; the README explains how to restore the project from the dashboard; an optional weekly keep-alive is an open question | supabase-auth-engineer, technical-writer |
+| Built-in email sends only 2 emails/hour, so sign-up confirmations and resets fail | High | Low–Medium | Single owner at first; document custom SMTP (its password stays in the Supabase dashboard) | supabase-auth-engineer |
+| Role escalation (user edits `profiles`, or a role read from `user_metadata`) | Low | High | No write policies plus revoked privileges; role read only from `profiles` with the user's token; security review of the migration; manual check with a non-admin account | supabase-auth-engineer, security-engineer |
+| A Function forgets `requireRole` | Medium | High | `requireRole` is the first line of every protected handler; a function test loops over every protected route; security review checklist | agent-console-engineer, qa-engineer |
+| Token theft through XSS (token in browser storage) | Low | High | CSP `script-src 'self'`, no `innerHTML` with remote or model text, short JWT expiry, auth files on the deny-list | security-engineer, frontend-engineer |
+| Mock base URL left set in production, so fake tokens are trusted | Low | High | Non-https base URLs accepted only when `context.deploy.context === "dev"`; mocks live in `tests/`, which is never bundled | supabase-auth-engineer, netlify-engineer |
+| Supabase outage | Low | Medium | Fail closed (503); the forecast path has no Supabase dependency | supabase-auth-engineer |
+| An agent proposes a change to auth code or migrations | Medium | High | Deny `supabase/**`, `login/**`, `src/lib/auth.*` in the allow-list at propose and at approve; human reviews the diff | security-engineer |
+| Open sign-up attracts spam accounts | Medium | Low | Accounts get role `user` (nothing to gain); Supabase rate limits; CAPTCHA or disabling sign-up later if needed | supabase-auth-engineer |
+| Two Supabase round-trips per protected call add latency | High | Low | Acceptable at this volume; JWKS verification can drop one round-trip later (D-008) | supabase-auth-engineer |

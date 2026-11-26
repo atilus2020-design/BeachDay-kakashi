@@ -29,15 +29,15 @@ Details and sources: `knowledge/supabase-auth-engineer/docs/`; runnable versions
 6. Only `super_admin` may open the Agents page, chat with agents or Approve; guard `agents`, `agent-chat`, `proposals` and `approve` identically, then keep the CSRF and rate-limit checks from `secrets-and-auth`.
 
 ## Database (`supabase/migrations/**`, see `examples/schema.sql`)
-- `public.profiles(id uuid pk references auth.users on delete cascade, email, display_name, role text not null default 'user' check (role in ('user','super_admin')))`.
-- `alter table ... enable row level security`; `revoke all` from `anon, authenticated`; `grant select` and `grant update (display_name)` to `authenticated`.
+- `public.profiles(id uuid pk references auth.users on delete cascade, email, role text not null default 'user' check (role in ('user','super_admin')))`.
+- `alter table ... enable row level security`; `revoke all` from `anon, authenticated`; `grant select` to `authenticated` only. **No INSERT/UPDATE/DELETE grants or policies** (docs/security.md, D-007); users can never edit `role`.
 - Policies: select and update own row with `(select auth.uid()) = id`. No insert or delete policy.
 - Role changes impossible from the API: column privilege (no `update(role)`) plus a `before update` trigger that raises when `current_user in ('anon','authenticated')`.
 - `security definer set search_path = ''` trigger `on auth.users after insert` creates the profile (`role = 'user'`).
 - Promote manually in the SQL editor only: `update public.profiles set role = 'super_admin' where email = '...';`
 
 ## Dashboard setup (document for the deployer)
-- Authentication → URL Configuration: **Site URL** = production URL; **Redirect URLs** = `https://<site>/**`, the reset page, `http://localhost:5173/**` (dev) and, if wanted, `https://**--<site-name>.netlify.app/**` for previews.
+- Authentication → URL Configuration: **Site URL** = production URL; **Redirect URLs** = exact URLs only in production: `https://<site>/login/` and `https://<site>/login/reset/` (docs/security.md R13). Localhost and Deploy Previews use a **separate dev Supabase project**.
 - Google Cloud: OAuth client type **Web application**; Authorized JavaScript origins = the site (and localhost for dev); Authorized redirect URI = `https://<project-ref>.supabase.co/auth/v1/callback`; paste Client ID and Secret into Supabase → Providers → Google.
 - Review the password minimum length and email confirmation settings.
 

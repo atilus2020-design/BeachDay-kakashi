@@ -103,7 +103,7 @@ Short records of decisions the project lead has made. A new decision that replac
   - POST endpoints also check CSRF (D-006). `GET /api/forecast` stays public.
 - **Consequences:**
   - Each protected call makes about two extra HTTPS round-trips to Supabase. That is acceptable inside the 60 s limit and at the Agents page's low volume.
-  - Revoked roles take effect immediately. A signed-out session's access token can still pass step 2 until it expires, so keep the JWT expiry short (Supabase Auth settings).
+  - Revoked roles take effect on the next request. Step 2 asks the Auth server, which rejects tokens whose session no longer exists (error code `session_not_found`, for example after sign-out: https://supabase.com/docs/guides/auth/debugging/error-codes). Local JWKS verification would accept such a token until it expires. If we switch to JWKS, keep the JWT expiry short.
   - Anyone can read the publishable key from the bundle. That is safe by design, because it maps to the `anon` or `authenticated` role under RLS.
   - Tests point `SUPABASE_URL` at a local mock (`docs/build-plan.md` §7). To stop a misconfigured production site from trusting a mock, `_lib/auth.*` accepts a non-`https://` `SUPABASE_URL` only when `context.deploy.context === "dev"`.
   - If background jobs (doc 04 §4.7) are added later, the background function cannot re-check a user token for 15 minutes. It verifies the internal HMAC signature (`JOB_SIGNING_SECRET`) instead, and `POST /api/jobs` performs the full token and role check. That is the only allowed exception, and it needs a new record when it is built.

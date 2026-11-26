@@ -368,7 +368,7 @@ function chatError(e: ApiFailure): PanelError {
   if (e.status === 400) return { text: "That message couldn't be sent. Try a shorter one.", retry: false };
   if (e.status === 404) return { text: "That agent isn't available any more.", retry: false };
   if (e.status === 413) return { text: "That conversation is too long. Clear the chat and start again.", retry: false };
-  if (e.status === 429) return { text: /budget|daily|today|limit reached/i.test(e.error) ? "You've reached today's chat limit. Try again tomorrow." : "Too many messages. Wait a minute.", retry: false };
+  if (e.status === 429) return { text: e.error === "Daily chat limit reached" ? "You've reached today's chat limit. Try again tomorrow." : "Too many messages. Wait a minute.", retry: false };
   if (e.status === 503) return { text: "Sign-in service unavailable, try again later.", retry: true };
   return { text: "Something went wrong. Try again.", retry: true };
 }
@@ -694,6 +694,8 @@ function openApprove(p: Proposal, trigger: HTMLElement): void {
           f.status === 400 ? "The title doesn't match. Check it and try again."
           : f.status === 422 ? "This change touches a file agents can't edit, so it can't be approved."
           : f.status === 429 ? "Too many tries. Wait a minute, then try again."
+          : f.status === 502 ? "GitHub is unavailable right now. Nothing was committed. Try again later."
+          : f.status === 413 ? "This proposal is too large to approve."
           : f.status === 503 ? (/sign-in/i.test(f.error) ? "Sign-in service unavailable, try again later." : "Approving is turned off on this site. Preview deploys can't commit.")
           : "Something went wrong. Nothing was committed. Try again.");
       }

@@ -47,7 +47,7 @@ export const TOOLS = [
       type: "object",
       additionalProperties: false,
       required: ["dir"],
-      properties: { dir: { type: "string", description: "Repo-relative directory, e.g. src/app, or \"\" for the root" } },
+      properties: { dir: { type: "string", description: "Repo-relative directory, e.g. src/pages, or \"\" for the root" } },
     },
   },
   {
@@ -71,7 +71,7 @@ export const TOOLS = [
             additionalProperties: false,
             required: ["path", "action", "content"],
             properties: {
-              path: { type: "string", description: "Repo-relative path, e.g. src/app/today.ts" },
+              path: { type: "string", description: "Repo-relative path, e.g. src/pages/home.ts" },
               action: { type: "string", enum: ["create", "update", "delete"] },
               content: { type: "string", description: "Full file content (empty for delete)" },
             },

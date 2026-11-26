@@ -16,6 +16,8 @@ export interface Beach {
   lat: number;
   lon: number;
   nwsOffice: string;
+  /** NWS Surf Zone Forecast page for this beach; the rip-current link uses it (D-002). */
+  nwsUrl: string;
   coast?: "atlantic" | "gulf";
 }
 
@@ -82,7 +84,8 @@ export interface ChatEventMap {
   proposal: { id: string; title: string };
   /** Exactly one of done | error, always last. */
   done: { stop_reason: string };
-  error: { message: string };
+  /** retryAfter: seconds, present when Claude rate-limited the turn. */
+  error: { message: string; retryAfter?: number };
 }
 
 export type ChatEventName = keyof ChatEventMap;

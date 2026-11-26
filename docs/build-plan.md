@@ -393,7 +393,7 @@ Goal: every unit, function and e2e test runs with **no real key, token or Supaba
    - `netlify/functions/_generated/agents.json`: public summaries;
    - `agents-private.json`: per agent, `{ model, system }`, where `system` = the agent body + every skill in its `skills:` list (`.claude/skills/<s>/SKILL.md`) + the text of its knowledge files (skip fixtures over 20 KB and binary files; cap at about 120,000 characters total, truncating examples first).
 
-   Each agent therefore answers with **its own instructions, knowledge and model** (opus→`claude-opus-5-5`, sonnet→`claude-sonnet-5-5`, haiku→`claude-haiku-5-5`). Functions import the JSON; `_generated/` is git-ignored and built before `vite build` and before tests (`npm run build:agents`).
+   Each agent therefore answers with **its own instructions, knowledge and model** (opus→`claude-opus-5-5`, sonnet→`claude-sonnet-5-5`, haiku→`claude-haiku-5-5`; a full model ID on the allow-list is also accepted as `modelAlias: "custom"`, currently `claude-fable-5-2`. The allow-list is checked in `scripts/build-agents.mjs` and again in `_lib/agents.ts`). Functions import the JSON; `_generated/` is git-ignored and built before `vite build` and before tests (`npm run build:agents`).
 4. **Upstream base URLs (mockable).**
    - Forecast: `OPEN_METEO_BASE` (default `https://api.open-meteo.com`, path `/v1/forecast`).
    - Marine: `OPEN_METEO_MARINE_BASE` (default `https://marine-api.open-meteo.com`, path `/v1/marine`).

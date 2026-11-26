@@ -60,7 +60,7 @@ export default async (req: Request, ctx: Context) => {
   try {
     if (!(await checkAndReserveTurn(user.id))) {
       await audit(ctx, user, "denied", "/api/agent/chat", { status: 429, reason: "budget" });
-      return json(429, { error: "Too many requests" });
+      return json(429, { error: "Daily chat limit reached" });
     }
   } catch {
     return json(500, { error: "Something went wrong" });

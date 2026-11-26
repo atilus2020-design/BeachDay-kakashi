@@ -6,7 +6,7 @@
   /* surfaces + text */
   --bg: #eef6fb;           --surface: #ffffff;       --surface-2: #e4f0f8;
   --text: #0b2233;         --text-2: #3d5566;
-  --line: #8fa6b6;         /* UI parts / borders, >= 3:1 on surface */
+  --line: #6a8294;         /* UI parts / borders, >= 3:1 on surface */
   --line-soft: rgba(11, 34, 51, 0.12);
 
   /* accent + status */
@@ -23,7 +23,7 @@
   --diff-add-bg: #e3f4ea;  --diff-del-bg: #fbe6e4;   --diff-add-text: #0b5a2d; --diff-del-text: #8c1d17;
 
   /* glass */
-  --glass-tint: rgba(255, 255, 255, 0.62);  --glass-border: rgba(255, 255, 255, 0.7);
+  --glass-tint: rgba(255, 255, 255, 0.78);  --glass-border: rgba(255, 255, 255, 0.7);
   --glass-highlight: rgba(255, 255, 255, 0.8);
   --scrim: rgba(7, 24, 35, 0.4);
   --shadow-1: 0 1px 2px rgba(11, 34, 51, 0.08), 0 4px 14px rgba(11, 34, 51, 0.08);
@@ -66,7 +66,7 @@
     --banner-info-bg: #12405c;  --banner-stale-bg: #3d3010;
     --banner-offline-bg: #263341; --banner-error-bg: #44201d;
     --diff-add-bg: #123a27; --diff-del-bg: #44201d;  --diff-add-text: #8ee6b0; --diff-del-text: #ffb4ac;
-    --glass-tint: rgba(16, 40, 58, 0.62);  --glass-border: rgba(255, 255, 255, 0.14);
+    --glass-tint: rgba(16, 40, 58, 0.78);  --glass-border: rgba(255, 255, 255, 0.14);
     --glass-highlight: rgba(255, 255, 255, 0.16);
     --scrim: rgba(0, 0, 0, 0.55);
     --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4), 0 4px 14px rgba(0, 0, 0, 0.3);

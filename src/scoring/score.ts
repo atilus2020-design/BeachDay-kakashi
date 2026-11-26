@@ -152,7 +152,7 @@ export function scoreWeek({ forecast, marine }: BeachInputs): DayScore[] {
     const good: Record<Key, string> = {
       rain: `Dry, rain chance ${round(maxPop)}%`,
       feels: `Comfortable, feels like ${round(avgFeels)}°F`,
-      wind: `Light winds, ${round(avgWind)} mph`,
+      wind: `${avgWind <= 12 ? "Light winds" : "Gentle breeze"}, ${round(avgWind)} mph`,
       waves: `Gentle surf, ${round(wavesAvg)} ft`,
       sky: `Mostly sunny (${round(avgCloud)}% cloud)`,
       water: `Water ${waterF}°F`,

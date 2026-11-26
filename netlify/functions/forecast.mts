@@ -54,7 +54,9 @@ export default async (req: Request): Promise<Response> => {
   if (!forecast && !marine) return err(502, "Weather data is unavailable right now");
 
   const body = { beach, forecast, marine, partial: !forecast || !marine, fetchedAt: new Date().toISOString() };
-  return new Response(JSON.stringify(body), { status: 200, headers: headers(OK_CACHE) });
+  // A partial answer should not stick in the CDN for 30 min.
+  const cache = body.partial ? { ...OK_CACHE, "Netlify-CDN-Cache-Control": "public, s-maxage=60" } : OK_CACHE;
+  return new Response(JSON.stringify(body), { status: 200, headers: headers(cache) });
 };
 
 export const config: Config = {

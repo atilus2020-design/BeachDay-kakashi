@@ -45,7 +45,7 @@ if (url) {
   try {
     const origin = new URL(url).origin;
     if (origin.startsWith("https://")) {
-      const csp = `default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self' ${origin}; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; manifest-src 'self'; worker-src 'self'`;
+      const csp = `default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; object-src 'none'; connect-src 'self' ${origin}; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; manifest-src 'self'; worker-src 'self'`;
       appendFileSync(join(dist, "_headers"), `\n/*\n  Content-Security-Policy: ${csp}\n`);
       console.log(`check-secrets: CSP connect-src pinned to ${origin}`);
     } else {
@@ -56,5 +56,10 @@ if (url) {
   }
 } else {
   console.warn("check-secrets: VITE_SUPABASE_URL unset; CSP left at netlify.toml default");
+}
+// Production builds must pin the exact Supabase origin (security-engineer review).
+if (env.CONTEXT === "production" && !(url && url.startsWith("https://"))) {
+  console.error("check-secrets: FAIL — production build needs an https VITE_SUPABASE_URL");
+  process.exit(1);
 }
 console.log("check-secrets: OK");

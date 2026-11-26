@@ -26,7 +26,7 @@ export const LIMITS = Object.freeze({
 // Writable trees (case-sensitive match on the exact spelling).
 const WRITE_ALLOW_PREFIX = [
   "src/app/", "src/pages/", "src/lib/", "src/styles/", "src/scoring/", "src/data/",
-  "public/", "tests/", "docs/", "knowledge/",
+  "public/", "tests/", "docs/",
 ] as const;
 // Root-level HTML the agents may edit: the home page and the content pages.
 // New root pages are not allowed (vite.config.* would not build them anyway).
@@ -38,6 +38,7 @@ const WRITE_ALLOW_EXACT = [
 const WRITE_DENY_PREFIX = [
   ".github/", ".claude/", "netlify/", "scripts/", "supabase/", "login/", "agents/",
   "node_modules/", "dist/", ".netlify/",
+  "knowledge/", // compiled into agents' system prompts: a human edits it, never a proposal (orchestrator decision)
   "src/pages/agents.", "src/pages/login", // console + auth page code (token, Approve)
 ] as const;
 const WRITE_DENY_EXACT = [

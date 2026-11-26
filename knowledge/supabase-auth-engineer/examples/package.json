@@ -1,0 +1,1 @@
+{ "name": "supabase-auth-examples", "private": true, "type": "module", "devDependencies": { "@electric-sql/pglite": "0.3.14" } }

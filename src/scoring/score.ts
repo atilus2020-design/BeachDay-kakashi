@@ -159,7 +159,12 @@ export function scoreWeek({ forecast, marine }: BeachInputs): DayScore[] {
     };
     const keys = (Object.keys(W) as Key[]).filter((k) => avg(k) != null);
     const byPenalty = [...keys].sort((a, b) => (100 - avg(b)!) * W[b] - (100 - avg(a)!) * W[a]);
-    const reasons = [...vetoReasons, ...byPenalty.filter((k) => avg(k)! < 60).map((k) => bad[k])].slice(0, 3);
+    const partial = M == null || hours.every((h) => h.wave == null);
+    const reasons = [
+      ...vetoReasons,
+      ...(partial ? ["Wave data unavailable right now"] : []),
+      ...byPenalty.filter((k) => avg(k)! < 60).map((k) => bad[k]),
+    ].slice(0, 3);
     const highlights = [...keys].sort((a, b) => avg(b)! * W[b] - avg(a)! * W[a])
       .filter((k) => avg(k)! >= 80).map((k) => good[k]).slice(0, 3);
 
@@ -169,7 +174,7 @@ export function scoreWeek({ forecast, marine }: BeachInputs): DayScore[] {
     const day: DayScore = {
       date, score, label, labelText, vetoes, reasons, highlights,
       uv: { max: uvMax, category: uvCategory(uvMax) },
-      lowConfidence, partial: M == null || hours.every((h) => h.wave == null),
+      lowConfidence, partial,
       waterF,
     };
     if (!lowConfidence && blk) {

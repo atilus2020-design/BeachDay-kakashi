@@ -3,17 +3,19 @@
 // Syntax-checked only (needs a browser): node --check browser-auth.js
 import { createClient } from "@supabase/supabase-js";
 
-export const supabase = createClient(import.meta.env.VITE_SUPABASE_URL, import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY);
+export const supabase = createClient(import.meta.env.VITE_SUPABASE_URL, import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+  { auth: { flowType: "pkce" } }); // R13: OAuth/email links return a one-time code, not tokens in the URL
+// Production version (null-safe when the VITE vars are missing, safe `next`): src/lib/auth.ts
 
 export const signUp = (email, password) =>
-  supabase.auth.signUp({ email, password, options: { emailRedirectTo: `${location.origin}/` } }); // session is null until the email is confirmed
+  supabase.auth.signUp({ email, password, options: { emailRedirectTo: `${location.origin}/login/` } }); // session is null until the email is confirmed
 export const logIn = (email, password) => supabase.auth.signInWithPassword({ email, password });
 export const logOut = () => supabase.auth.signOut();
 export const forgotPassword = (email) =>
   supabase.auth.resetPasswordForEmail(email, { redirectTo: `${location.origin}/login/reset/` }); // same message whether or not the account exists
 export const setNewPassword = (password) => supabase.auth.updateUser({ password }); // only on the recovery page, after PASSWORD_RECOVERY
 export const continueWithGoogle = () =>
-  supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo: `${location.origin}/` } });
+  supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo: `${location.origin}/login/` } });
 
 let accessToken = null; // keep the JWT in memory; TOKEN_REFRESHED keeps it fresh
 export function watchAuth(onChange) {

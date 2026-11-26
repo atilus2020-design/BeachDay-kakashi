@@ -102,7 +102,7 @@ Source: https://supabase.com/docs/guides/database/postgres/column-level-security
 revoke update on table public.posts from authenticated;
 grant update (title, content) on table public.posts to authenticated;
 ```
-- Caveat: "If you have both, and you revoke the column-level privilege, the table-level privilege will still be in effect." So revoke the table-level grant first, then grant only safe columns. RLS policies cannot restrict which *columns* change; privileges do. The `protect_profile_role` trigger in `examples/schema.sql` is a second layer (our design, not from this page).
+- Caveat: "If you have both, and you revoke the column-level privilege, the table-level privilege will still be in effect." So revoke the table-level grant first, then grant only safe columns. RLS policies cannot restrict which *columns* change; privileges do. Beach Day grants no update at all today; if editable columns are added later (new decision record), use this column grant plus a `before update` trigger that blocks `role` changes (security.md R4).
 
 ## 8. API keys
 Source: https://supabase.com/docs/guides/getting-started/api-keys
@@ -126,4 +126,4 @@ begin insert into public.profiles (id, first_name, last_name)
   values (new.id, new.raw_user_meta_data ->> 'first_name', new.raw_user_meta_data ->> 'last_name'); return new; end; $$;
 create trigger on_auth_user_created after insert on auth.users for each row execute procedure public.handle_new_user();
 ```
-- Beach Day differs on purpose: no `anon` grant, `authenticated` gets select plus update on `display_name` only, and a `role` column defaulting to `'user'`.
+- Beach Day differs on purpose: no `anon` grant, `authenticated` gets **select only** (no insert/update/delete grant or policy, security.md R4), the trigger inserts `(id, email)` only, and a `role` column defaults to `'user'`. Migration: `supabase/migrations/20261126000000_profiles.sql`.

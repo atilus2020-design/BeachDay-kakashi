@@ -179,10 +179,10 @@ function todayCard(v: View): HTMLElement {
 function strip(v: View): HTMLElement {
   const wrap = h("div", { class: "day-strip", role: "group", "aria-labelledby": "next-days-title", testid: "day-strip" });
   v.days.forEach((d, i) => {
-    const name = `${weekdayLong(d.date)}, score ${d.score}, ${labelText(d)}${d.lowConfidence ? ", lower confidence" : ""}`;
+    // No aria-label: the name comes from the visible text ("Thu 86 Great Lower confidence"), so WCAG 2.5.3 holds.
     const cell = h("button", {
       type: "button", class: "day-strip__day", testid: "day-cell", "data-date": d.date, "data-low-confidence": d.lowConfidence ? "true" : null,
-      "aria-pressed": selected === i ? "true" : "false", "aria-label": name, on: { click: () => toggleDay(i) },
+      "aria-pressed": selected === i ? "true" : "false", on: { click: () => toggleDay(i) },
     },
       h("span", { class: "day-strip__name" }, weekdayShort(d.date)),
       h("span", { class: `score--${d.label}` }, icon(ICON[d.label], 20)),
@@ -202,6 +202,7 @@ function renderForecast(): void {
   renderUpdated();
   area.replaceChildren(
     todayCard(view),
+    installSlot, // persistent node, shown after the Today card
     h("section", { class: "section" }, h("h2", { class: "section__title", id: "next-days-title" }, "Next days"), strip(view)),
   );
   renderDetail(false);

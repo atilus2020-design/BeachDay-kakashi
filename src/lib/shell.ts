@@ -102,7 +102,7 @@ function buildFooter(footer: HTMLElement): void {
 // Style the PWA module's own elements (src/pwa/*) with Sable's classes after they render (we may not edit src/pwa).
 function decoratePwa(root: ParentNode): void {
   const add = (el: Element, classes: string, testid?: string): void => {
-    el.classList.add(...classes.split(" "));
+    el.classList.add(...classes.split(" ").filter(Boolean));
     if (testid && !el.hasAttribute("data-testid")) el.setAttribute("data-testid", testid);
   };
   root.querySelectorAll(".pwa-banner").forEach((b) => {
@@ -111,7 +111,7 @@ function decoratePwa(root: ParentNode): void {
   });
   root.querySelectorAll("button.install-btn").forEach((b) => add(b, "btn btn--primary", "install-button"));
   root.querySelectorAll("div.install-sheet").forEach((s) => {
-    add(s, "sheet", "install-ios-sheet");
+    add(s, "", "install-ios-sheet");
     s.querySelectorAll("button").forEach((btn) => add(btn, "btn btn--secondary", "install-ios-dismiss"));
   });
 }

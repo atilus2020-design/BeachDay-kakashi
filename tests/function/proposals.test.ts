@@ -61,6 +61,7 @@ describe("POST /api/proposals/:id/approve", () => {
 
   it("400 when the confirm title is wrong, and nothing is written", async () => {
     const { id } = await createProposal();
+    await resetMocks(); // createProposal itself reads GitHub (head + blob); count only what approve does
     const res = await approve(id, { json: { confirmTitle: "wrong title" } });
     expect(res.status).toBe(400);
     expect((await calls()).filter((c) => c.path.startsWith("/github"))).toHaveLength(0);
@@ -118,6 +119,7 @@ describe("POST /api/proposals/:id/approve", () => {
   });
   it("503 when GITHUB_TOKEN is not set (Deploy Previews)", async () => {
     const { id, title } = await createProposal();
+    await resetMocks();
     const saved = process.env.GITHUB_TOKEN; delete process.env.GITHUB_TOKEN;
     try {
       const res = await approve(id, { json: { confirmTitle: title } });

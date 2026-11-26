@@ -52,8 +52,14 @@ create trigger on_auth_user_created
 
 -- ---------------------------------------------------------------------------------------------
 -- Promote the owner to super_admin: run MANUALLY in the Supabase SQL editor, never from the app.
--- No endpoint, UI or agent can do this.
+-- No endpoint, UI or agent can do this. Promote by id, and only an account whose email is confirmed
+-- (profiles.email is a copy taken at signup; auth.users is the source of truth):
 --
+--   update public.profiles p set role = 'super_admin'
+--   from auth.users u
+--   where p.id = u.id and u.email = '<owner email>' and u.email_confirmed_at is not null;
+--
+-- Check it changed exactly one row ("UPDATE 1"). Short form from build-plan §3.6, only if the email is confirmed:
 --   update public.profiles set role = 'super_admin' where email = '<owner email>';
 --
 -- Revoke access again:

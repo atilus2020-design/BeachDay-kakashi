@@ -180,7 +180,9 @@ export async function signOut(): Promise<void> {
 
 /**
  * Send the reset email (returns to /login/reset/). Resolves the same way whether or not the account exists
- * (no enumeration); rejects only when not configured, rate limited or the service is unreachable.
+ * (no enumeration). Rate limits also resolve: Supabase's per-address cooldown fires only for existing
+ * accounts, so surfacing it would reveal the account (security.md R15 / A3). Rejects only when not
+ * configured ("not_configured") or the service is unreachable ("network").
  */
 export async function sendPasswordReset(email: string): Promise<void> {
   const sb = client();
@@ -189,7 +191,7 @@ export async function sendPasswordReset(email: string): Promise<void> {
     if (error) throw error;
   } catch (err) {
     const fe = toFlowError(err);
-    if (fe.code === "rate_limited" || fe.code === "network") throw fe;
+    if (fe.code === "network" || fe.code === "not_configured") throw fe;
   }
 }
 

@@ -32,7 +32,7 @@ export function append(node: Node, children: Child[]): void {
   }
 }
 
-export function clear(node: Node): void {
+export function clear(node: Element | DocumentFragment): void {
   node.replaceChildren();
 }
 

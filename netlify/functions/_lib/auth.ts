@@ -43,7 +43,9 @@ function deny(status: number, error: string, extra: Record<string, string> = {})
   };
 }
 
-/** SUPABASE_URL must be https, except under `netlify dev` or vitest (build-plan §9.5). */
+const LOOPBACK = new Set(["127.0.0.1", "localhost", "[::1]"]);
+
+/** SUPABASE_URL must be https, except a loopback http URL under `netlify dev` or vitest (build-plan §9.5). */
 function supabaseConfig(ctx: Context | undefined): { url: string; key: string } | null {
   const url = (process.env.SUPABASE_URL ?? "").trim();
   const key = (process.env.SUPABASE_PUBLISHABLE_KEY ?? "").trim();
@@ -56,7 +58,7 @@ function supabaseConfig(ctx: Context | undefined): { url: string; key: string } 
   }
   const devOrTest = ctx?.deploy?.context === "dev" || process.env.NODE_ENV === "test";
   if (parsed.protocol === "https:") return { url, key };
-  if (parsed.protocol === "http:" && devOrTest) return { url, key };
+  if (parsed.protocol === "http:" && devOrTest && LOOPBACK.has(parsed.hostname)) return { url, key };
   return null;
 }
 
@@ -77,8 +79,8 @@ export async function requireRole(
   const method = req.method.toUpperCase();
   if (!methods.includes(method)) return deny(405, MSG.method, { Allow: methods.join(", ") });
 
-  // 2–3. CSRF, non-GET only.
-  if (method !== "GET" && method !== "HEAD") {
+  // 2–3. CSRF, every method except GET.
+  if (method !== "GET") {
     let selfOrigin: string;
     try {
       selfOrigin = new URL(req.url).origin;
@@ -111,13 +113,14 @@ export async function requireRole(
   const timedFetch: typeof fetch = (input, init) =>
     fetch(input, { ...init, signal: init?.signal ? AbortSignal.any([init.signal, deadline]) : deadline });
 
-  // Per-request client carrying this caller's JWT (RLS applies to every query made with it).
-  const supabase = createClient(cfg.url, cfg.key, {
-    global: { headers: { Authorization: `Bearer ${jwt}` }, fetch: timedFetch },
-    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
-  });
-
   try {
+    // Per-request client carrying this caller's JWT (RLS applies to every query made with it).
+    // Inside the try: any throw while building it also fails closed with 503.
+    const supabase: SupabaseClient = createClient(cfg.url, cfg.key, {
+      global: { headers: { Authorization: `Bearer ${jwt}` }, fetch: timedFetch },
+      auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+    });
+
     // 5. Verify the token with Supabase Auth (GET {SUPABASE_URL}/auth/v1/user).
     const { data: userData, error: userErr } = await supabase.auth.getUser(jwt);
     if (userErr) {

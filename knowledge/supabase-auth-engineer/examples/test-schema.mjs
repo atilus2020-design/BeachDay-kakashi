@@ -7,7 +7,7 @@ const db = new PGlite();
 const STUB = `
   create role anon nologin; create role authenticated nologin; create role supabase_auth_admin nologin;
   create schema auth;
-  create table auth.users (id uuid primary key default gen_random_uuid(), email text, raw_user_meta_data jsonb);
+  create table auth.users (id uuid primary key default gen_random_uuid(), email text, raw_user_meta_data jsonb, email_confirmed_at timestamptz);
   create function auth.uid() returns uuid language sql stable
     as $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
   grant usage on schema public, auth to anon, authenticated;
@@ -70,8 +70,14 @@ await db.exec(`set role supabase_auth_admin; insert into auth.users (id, email, 
 r = await db.query(`select role from public.profiles where id = '${C}'`);
 check("signup by supabase_auth_admin creates row; metadata role ignored", r.rows[0]?.role === "user", JSON.stringify(r.rows));
 
-// Manual promotion in the SQL editor (postgres role) works and is then readable by the user.
-await db.exec("update public.profiles set role = 'super_admin' where email = 'alice@example.com'");
+// Manual promotion in the SQL editor (postgres role), by id, confirmed email only (the migration's comment).
+const promote = (addr) => db.query(`update public.profiles p set role = 'super_admin' from auth.users u
+  where p.id = u.id and u.email = '${addr}' and u.email_confirmed_at is not null`);
+r = await promote("alice@example.com");
+check("promotion SQL skips an unconfirmed account", r.affectedRows === 0, `affected ${r.affectedRows}`);
+await db.exec(`update auth.users set email_confirmed_at = now() where id = '${A}'`);
+r = await promote("alice@example.com");
+check("promotion SQL updates exactly one confirmed account", r.affectedRows === 1, `affected ${r.affectedRows}`);
 r = await as("authenticated", A, "select role from public.profiles");
 check("manual SQL-editor promotion works; A now reads role super_admin", r.rows[0]?.role === "super_admin");
 r = await as("authenticated", B, "select role from public.profiles");

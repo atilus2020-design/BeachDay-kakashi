@@ -39,5 +39,6 @@ create trigger on_auth_user_created
   after insert on auth.users
   for each row execute procedure public.handle_new_user();
 
--- Make someone super_admin: run MANUALLY in the SQL editor (never from the app):
---   update public.profiles set role = 'super_admin' where email = '<owner email>';
+-- Make someone super_admin: run MANUALLY in the SQL editor (never from the app), by id, confirmed email only:
+--   update public.profiles p set role = 'super_admin' from auth.users u
+--   where p.id = u.id and u.email = '<owner email>' and u.email_confirmed_at is not null;

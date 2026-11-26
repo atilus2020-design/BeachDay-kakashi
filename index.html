@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Beach Day: South Florida beach forecast</title>
+  <meta name="description" content="Is it a good day to go to the beach? Pick a South Florida beach and see today's score, the best window and the week ahead.">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <meta name="theme-color" content="#0b3d5c">
+  <link rel="icon" href="/icons/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon-180.png">
+  <link rel="stylesheet" href="/src/styles/base.css">
+</head>
+<body>
+  <header class="site-header" data-shell></header>
+  <noscript>
+    <nav class="site-nav" aria-label="Site">
+      <a href="/">Beach Day</a>
+      <a href="/agents/">Agents</a>
+      <a href="/how-it-works/">How it works</a>
+      <a href="/resources/">Resources</a>
+      <a href="/login/">Sign in</a>
+    </nav>
+  </noscript>
+
+  <main id="main" class="page" tabindex="-1">
+    <h1 class="visually-hidden">Beach Day: South Florida beach forecast</h1>
+    <noscript><p>Beach Day needs JavaScript to show the forecast.</p></noscript>
+    <div id="banners"></div>
+    <div class="field">
+      <label class="field__label" for="beach-picker">Beach</label>
+      <select id="beach-picker" class="select" data-testid="beach-picker"></select>
+    </div>
+    <p id="updated-line" class="text-2" data-testid="updated-line" hidden></p>
+    <div id="forecast-area"></div>
+    <div id="day-detail-slot"></div>
+    <div id="install-slot"></div>
+  </main>
+
+  <footer class="site-footer" data-shell></footer>
+  <script type="module" src="/src/pages/home.ts"></script>
+</body>
+</html>

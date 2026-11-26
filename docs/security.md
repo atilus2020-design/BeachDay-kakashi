@@ -44,9 +44,9 @@ Netlify Function ── requireRole(): verify token with Supabase Auth (getUser)
 | T6 | OAuth or password-reset redirect sent to an attacker's site, leaking tokens or codes | Account takeover | R13, R14 |
 | T7 | Account takeover of the owner (weak password, unconfirmed email squatting, phishing) | Full console access | R15, R14, R13 |
 | T8 | CSRF: another site makes the owner's browser call `/api/...` | Unwanted chat, job or Approve | R1 (bearer header), R10 |
-| T9 | XSS steals the access token from browser storage | Session hijack for up to the token lifetime | CSP `script-src 'self'`, model output rendered with `textContent` (doc 04), short JWT lifetime, R2 (role re-read each request) |
+| T9 | XSS steals the access token from browser storage | Session hijack for up to the token lifetime | CSP `script-src 'self'; object-src 'none'; base-uri 'self'` (B4), model output rendered with `textContent` (doc 04), short JWT lifetime, R2 (role re-read each request) |
 | T10 | Prompt injection steers an agent into a harmful proposal | Malicious commit | R9, human review of the full diff, deny-list for security code (doc 04 §4.5.4) |
-| T11 | An agent or proposal changes CI, build or Function code to escape | Secret theft, persistent backdoor | R8 (no Workflows permission), R9 (deny `netlify/**`, `.github/**`, `package*.json`, `scripts/**`, `.claude/**`) |
+| T11 | An agent or proposal changes CI, build or Function code to escape | Secret theft, persistent backdoor | R8 (no Workflows permission), R9 (deny `netlify/**`, `.github/**`, `package*.json`, `scripts/**`, `vite.config.*`, `.claude/**`, `knowledge/**`) |
 | T12 | A demoted or deleted admin keeps using an old token | Continued access | R2 (role read from the database on every request, not from the JWT), `on delete cascade` on `profiles` |
 | T13 | Information leakage through error messages | Recon, token or header echo | R16 |
 | T14 | Nobody notices abuse | Damage grows | R17 |
@@ -150,7 +150,13 @@ Decision D-005: Contents read/write and Metadata read only, an expiry (about 90 
 
 ### R9. Path allow-list enforced at propose AND at approve (T2, T10, T11)
 
-`netlify/functions/_lib/allowlist.ts` is the single policy (`path-allowlist` skill; doc 04 §4.5.4). Per D-007 the deny-list also covers the auth code and migrations: `supabase/**`, `login/**`, `src/lib/auth.*`. The `propose_change` tool handler validates every path, size and encoding; the `approve` Function **re-validates the stored proposal from scratch** before building the tree. Deny wins; any violation rejects the whole proposal. Tree entries are mode `100644` only.
+`netlify/functions/_lib/allowlist.ts` is the single policy and the source of truth (`path-allowlist` skill; doc 04 §4.5.4 is an older sketch). If this text and the module ever disagree, the module wins and this text is corrected. The `propose_change` tool handler validates every path, size and encoding (`assertProposalLimits`); the `approve` Function **re-validates the stored proposal from scratch** before building the tree. Default deny, deny wins; any violation rejects the whole proposal. Tree entries are mode `100644` only.
+
+- **Write allow:** the trees `src/app/`, `src/pages/`, `src/lib/`, `src/styles/`, `src/scoring/`, `src/data/`, `public/`, `tests/`, `docs/`, and exactly `index.html`, `how-it-works/index.html`, `resources/index.html`, `guide/index.html`. Nothing else, including new root-level pages.
+- **Write deny (wins, matched on the lower-cased path so case tricks fail):** `.github/**`, `.claude/**`, `netlify/**`, `netlify.toml`, `scripts/**`, `package*.json`, `vite.config.*`, `node_modules/**`, `dist/**`, `.netlify/**`; the auth and console code and migrations (D-007): `supabase/**`, `login/**`, `agents/**`, `src/lib/auth.*`, `src/lib/api.*`, `src/pages/agents.*`, `src/pages/login*`; the service worker and edge config `public/sw.js`, `public/_headers`, `public/_redirects`; and **`knowledge/**`**, because knowledge files are compiled into the agents' system prompts (build-plan §9.3), so a proposal that edits them would let an agent rewrite its own or another agent's instructions (orchestrator decision; a human edits `knowledge/` directly).
+- **Secrets, denied for read and write at any depth:** `.env*` and `*.env`, `*.pem`, `*.key`, `*.p12`, `*.pfx`, `*.jks`, `*.keystore`, `id_rsa`/`id_dsa`/`id_ecdsa`/`id_ed25519` (and `.pub`), `.npmrc`, and `.git` internals. `read_file`/`list_files` also never read `node_modules/`, `dist/` or `.netlify/`.
+- **Shape:** 1–200 characters of ASCII `[A-Za-z0-9._/-]` only (blocks backslash, NUL, drive letters, spaces, Unicode look-alikes), no leading `/`, no empty, `.` or `..` segments; case-colliding paths in one proposal count as duplicates.
+- **Limits:** at most 20 files, 200 KB each, 1 MB total; UTF-8 text only (no C0 controls other than tab/LF/FF/CR, no lone surrogates); `delete` carries empty content. Error messages are fixed strings that never echo the path or content.
 
 ### R10. CSRF defence in depth on every non-GET request (T8)
 
@@ -220,7 +226,7 @@ Netlify scopes: **Builds** (visible during `vite build`), **Functions** (visible
 |---|---|---|---|
 | `VITE_SUPABASE_URL` | Builds; all contexts | Public (inlined into the bundle) | Supabase project URL for the browser client |
 | `VITE_SUPABASE_PUBLISHABLE_KEY` | Builds; all contexts | Public by design (`sb_publishable_…`), safe only with R6 | Browser Supabase client |
-| `SUPABASE_URL` | Functions; all contexts | Public | Supabase project URL for the guard. Must be `https://` except when `context.deploy.context === "dev"` (tests may point it at a local mock, D-008) |
+| `SUPABASE_URL` | Functions; all contexts | Public | Supabase project URL for the guard. Must be `https://` except when `context.deploy.context === "dev"` (`netlify dev`) or `NODE_ENV === "test"` (vitest), so tests can point it at a local mock (D-008, build-plan §9.5). Never set `NODE_ENV=test` in Netlify |
 | `SUPABASE_PUBLISHABLE_KEY` | Functions; all contexts | Public | Guard's Supabase client (always combined with the caller's JWT) |
 | `ANTHROPIC_API_KEY` | Functions; Production (a separate low-limit key for previews and dev) | **Secret** | Claude API |
 | `GITHUB_TOKEN` | Functions; **Production only** | **Secret** | Fine-grained PAT (D-005) |
@@ -289,7 +295,7 @@ Guard and Functions (each protected endpoint, using mocks or the test project):
 - [ ] F6 Demote the owner in SQL → the next request with the same, unexpired token → 403.
 - [ ] F7 POST without `X-Requested-With: beachday` → 403; with `Origin: https://evil.example` → 403; with `Sec-Fetch-Site: cross-site` → 403.
 - [ ] F8 Supabase unreachable or 5xx (mock) → 503, never success, never a stack trace.
-- [ ] F8b A non-`https://` `SUPABASE_URL` outside the `dev` context → every protected request refused.
+- [ ] F8b A non-`https://` `SUPABASE_URL` outside the `dev` context and outside `NODE_ENV=test` → every protected request refused (503).
 - [ ] F8c A token whose session was signed out (`signOut`) → 401 (Auth returns `session_not_found`).
 - [ ] F9 Error bodies contain only `{error}`; no upstream text, token or header.
 - [ ] F10 `agent-job` called directly without a valid HMAC → rejected, no work done.
@@ -312,7 +318,7 @@ Secrets and build:
 - [ ] B1 Build check passes on a clean build and fails when a planted `sb_secret_`, `sk-ant-` or `github_pat_` string is in `dist/`.
 - [ ] B2 `dist/` contains the publishable key and URL only; no other env values.
 - [ ] B3 Netlify env has no `SUPABASE_SECRET_KEY` / `SUPABASE_SERVICE_ROLE_KEY`; secrets are Functions-scoped and marked secret.
-- [ ] B4 CSP `connect-src` lists only `'self'` and the Supabase project origin.
+- [ ] B4 The production CSP is at least `default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; object-src 'none'; connect-src 'self' https://<project-ref>.supabase.co; frame-ancestors 'none'; base-uri 'self'; form-action 'self'`. `connect-src` lists only `'self'` and the exact Supabase project origin (no `*.supabase.co` wildcard); `object-src 'none'` blocks plugin content that `script-src` alone does not cover.
 
 ## 7. Owner setup steps (one-off, by the project lead)
 
@@ -326,7 +332,7 @@ Secrets and build:
 
 ## 8. Open items
 
-- CSP in `docs/03-architecture.md` §3.5 must add the Supabase project origin to `connect-src` (owner: netlify-engineer / software-architect).
+- CSP in `docs/03-architecture.md` §3.5 must match B4, including `object-src 'none'` (owner: software-architect). `netlify.toml` currently allows `connect-src https://*.supabase.co`; narrow it to the exact project origin before production (owner: netlify-engineer).
 - MFA for the `super_admin` account, and whether Functions should then also require the `aal2` assurance level.
 - Whether Netlify Deploy Previews get their own Supabase project (recommended) instead of preview URLs on the production allow-list.
 

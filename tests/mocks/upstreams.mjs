@@ -21,7 +21,7 @@ export const INITIAL_HEAD = "1111111111111111111111111111111111111111";
 export const PROPOSE_INPUT = {
   title: "Add QA note to docs/notes.md",
   summary: "Adds a short QA note.",
-  files: [{ path: "docs/notes.md", action: "update", content: "# Notes\n\nQA was here.\n" }],
+  files: [{ path: "docs/notes.md", action: "update", content: "# QA Notes\n\nQA was here.\n" }],
 };
 
 const sha1 = (s) => crypto.createHash("sha1").update(s).digest("hex");

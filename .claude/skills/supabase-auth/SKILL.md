@@ -4,37 +4,34 @@ description: "Supabase Auth for Beach Day: email+password and Continue with Goog
 ---
 # Supabase Auth (URL + publishable key only)
 
-Details and sources: `knowledge/supabase-auth-engineer/docs/`; runnable versions in `examples/`.
+Sources: `knowledge/supabase-auth-engineer/docs/`; runnable versions in its `examples/`.
 
 ## Keys and env
 - Browser (Vite): `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY` (`sb_publishable_...`, safe to expose).
 - Functions: `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`. **Never use or store the secret key** (`sb_secret_...`, bypasses RLS). The Google client secret lives only in the Supabase dashboard.
 - Publishable key goes in the `apikey` header; the user's access token goes in `Authorization: Bearer`.
 
-## Client (`src/lib/auth.*`)
-1. `createClient(URL, PUBLISHABLE_KEY)` once.
-2. `signUp({ email, password, options: { emailRedirectTo } })`: with Confirm email on, `session` is null; show "check your email".
-3. `signInWithPassword({ email, password })`; `signOut()`.
-4. Forgot password: `resetPasswordForEmail(email, { redirectTo: <site>/login/reset/ })`; always show the same message (no account enumeration). On that page, after the `PASSWORD_RECOVERY` event, call `updateUser({ password })`.
-5. Google: `signInWithOAuth({ provider: 'google', options: { redirectTo } })`.
-6. `onAuthStateChange`: keep the callback fast, store `session.access_token` in memory (`TOKEN_REFRESHED` updates it), unsubscribe on teardown.
-7. Every Function call sends `Authorization: Bearer <access_token>`. Hiding the Agents page for non-admins is cosmetic; the Function decides.
+## Browser (`src/lib/auth.ts`, imported only by login, login/reset and agents pages)
+- Exports: `supabase` (client or null), `isAuthConfigured`, `AuthFlowError` (codes: `not_configured`, `invalid_credentials`, `email_not_confirmed`, `weak_password`, `rate_limited`, `network`, `unknown`), `safeNext`, `takeNext`, `signUp(email, password, next?)`, `signIn`, `signInWithGoogle(next?)`, `signOut`, `sendPasswordReset(email)`, `updatePassword`, `getAccessToken`, `getRole`, `onAuthChange(cb)` (returns unsubscribe), `requireSuperAdmin(next)`.
+- Redirect URLs are exactly `${origin}/login/` (sign-up confirmation, Google) and `${origin}/login/reset/` (password reset); `next` travels via `sessionStorage`, never the URL.
+- `sendPasswordReset` resolves the same whether or not the account exists. Missing `VITE_*` vars never throw at import; calls reject with `not_configured`.
+- `getRole` and `requireSuperAdmin` are cosmetic; the Function decides. Send `Authorization: Bearer <getAccessToken()>` on every `/api` call.
 
-## Server (`netlify/functions/_lib/auth.*`), on every request
-1. Parse `Authorization: Bearer`; none or malformed → 401.
-2. Verify with Supabase: `GET {SUPABASE_URL}/auth/v1/user` with `apikey` + the Bearer token (or `auth.getUser(token)`); non-200 → 401. `getClaims` is allowed if the project uses asymmetric signing keys.
-3. Read the role from `profiles` with the **caller's JWT** (`/rest/v1/profiles?select=role&id=eq.<id>`, `apikey` = publishable key) so RLS applies. Role must equal `super_admin` → else 403. Missing row = deny.
-4. Never trust a role, id or email sent by the client or stored in `user_metadata`.
-5. Auth service error → fail closed (502). Generic error messages; never log tokens.
-6. Only `super_admin` may open the Agents page, chat with agents or Approve; guard `agents`, `agent-chat`, `proposals` and `approve` identically, then keep the CSRF and rate-limit checks from `secrets-and-auth`.
+## Server (`netlify/functions/_lib/auth.ts`)
+`const g = await requireRole(req, ctx, "super_admin", opts?); if (!g.ok) return g.response;` gives `g.user = { id, email }` and `g.supabase` (client carrying the caller's JWT). `opts.methods` defaults to GET and POST.
+1. Method not allowed → 405. Non-GET also needs same `Origin`, `Sec-Fetch-Site` same-origin if present, and `X-Requested-With: beachday` → else 403.
+2. `Authorization: Bearer <jwt>` missing or malformed → 401.
+3. Missing config or non-https `SUPABASE_URL` (except `netlify dev`/test) → 503.
+4. `GET {SUPABASE_URL}/auth/v1/user` with `apikey` + Bearer; 4xx → 401.
+5. `GET {SUPABASE_URL}/rest/v1/profiles?select=id,role&id=eq.<uuid>` with `apikey` + the caller's Bearer, so RLS applies. Exactly one row with matching id and `role === "super_admin"`, else 403 (missing row = deny).
+6. Supabase unreachable, timeout (5 s), 5xx, 408 or 429 → **503** (not 502), fail closed. Generic messages; never log tokens.
+7. Never trust a role, id or email from the client or `user_metadata`. Guard `agents`, `agent-chat`, `proposals` and `approve` identically.
 
-## Database (`supabase/migrations/**`, see `examples/schema.sql`)
+## Database (`supabase/migrations/**`, docs/security.md R4, D-007)
 - `public.profiles(id uuid pk references auth.users on delete cascade, email, role text not null default 'user' check (role in ('user','super_admin')))`.
-- `alter table ... enable row level security`; `revoke all` from `anon, authenticated`; `grant select` to `authenticated` only. **No INSERT/UPDATE/DELETE grants or policies** (docs/security.md, D-007); users can never edit `role`.
-- Policies: select and update own row with `(select auth.uid()) = id`. No insert or delete policy.
-- Role changes impossible from the API: column privilege (no `update(role)`) plus a `before update` trigger that raises when `current_user in ('anon','authenticated')`.
-- `security definer set search_path = ''` trigger `on auth.users after insert` creates the profile (`role = 'user'`).
-- Promote manually in the SQL editor only: `update public.profiles set role = 'super_admin' where email = '...';`
+- Enable RLS; `revoke all` from `anon, authenticated`; `grant select` to `authenticated` only. **No UPDATE, INSERT or DELETE grants or policies** on `profiles`; one select policy for the own row: `(select auth.uid()) = id`. No role-protect trigger needed.
+- `security definer set search_path = ''` trigger `on auth.users after insert` creates the profile with `role = 'user'`.
+- Promote only in the SQL editor: `update public.profiles set role = 'super_admin' where email = '...';`
 
 ## Dashboard setup (document for the deployer)
 - Authentication → URL Configuration: **Site URL** = production URL; **Redirect URLs** = exact URLs only in production: `https://<site>/login/` and `https://<site>/login/reset/` (docs/security.md R13). Localhost and Deploy Previews use a **separate dev Supabase project**.
@@ -42,4 +39,4 @@ Details and sources: `knowledge/supabase-auth-engineer/docs/`; runnable versions
 - Review the password minimum length and email confirmation settings.
 
 ## Test before accepting
-Run `examples/test-schema.mjs` and `examples/verify-token.mjs`: 401 no/bad token, 403 role `user`, 200 `super_admin`, a user reads only their own row and cannot change `role`.
+Run the schema and token examples in `knowledge/supabase-auth-engineer/examples/`: 401 no/bad token, 403 role `user`, 200 `super_admin`, a user reads only their own row and cannot change `role`.

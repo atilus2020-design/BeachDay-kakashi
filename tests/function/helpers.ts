@@ -1,4 +1,6 @@
 // Shared helpers for function tests: call handlers directly with new Request(...).
+import { fileURLToPath } from "node:url";
+const FUNCTIONS_DIR = fileURLToPath(new URL("../../netlify/functions/", import.meta.url));
 export const ORIGIN = "http://localhost:8888";
 let ipCounter = 0;
 
@@ -13,7 +15,7 @@ export const setState = (s: Record<string, unknown>) => mock("POST", "/__state",
 export const calls = (): Promise<any[]> => mock("GET", "/__calls");
 
 export async function load(mod: string): Promise<(req: Request, ctx: any) => Promise<Response> | Response> {
-  const m = await import(/* @vite-ignore */ `../../netlify/functions/${mod}`);
+  const m = await import(/* @vite-ignore */ FUNCTIONS_DIR + mod);
   return m.default;
 }
 

@@ -37,9 +37,14 @@ const REJECT: [string, string][] = [
   ["auth module variant", "src/lib/auth.test.ts"],
   ["case trick on auth module", "src/lib/AUTH.ts"],
   ["case trick on supabase", "SUPABASE/x.sql"],
+  ["api client (attaches bearer token)", "src/lib/api.ts"],
+  ["agents page code", "src/pages/agents.ts"],
+  ["login page code", "src/pages/login.ts"],
+  ["knowledge (compiled into prompts)", "knowledge/qa-engineer/docs/x.md"],
+  ["service worker", "public/sw.js"],
 ];
 
-const ACCEPT = ["src/app/today.ts", "src/pages/home.ts", "src/lib/api.ts", "src/scoring/score.ts", "src/styles/x.css", "public/icons/x.svg", "docs/notes.md", "tests/unit/x.test.ts", "knowledge/qa-engineer/docs/x.md"];
+const ACCEPT = ["src/app/today.ts", "src/pages/home.ts", "src/scoring/score.ts", "src/styles/x.css", "public/icons/x.svg", "docs/notes.md", "tests/unit/x.test.ts"];
 
 describe("assertWritablePath", () => {
   it.each(REJECT)("rejects %s (%j)", (_n, p) => {

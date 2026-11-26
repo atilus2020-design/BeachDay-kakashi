@@ -125,7 +125,7 @@ describe("doc 05 scoring cases (synthetic days)", () => {
       const d = one(date);
       expect(d.date).toBe(date);
       if (d.bestWindow) {
-        const s = +d.bestWindow.start.slice(11, 13), e = +d.bestWindow.end.slice(11, 13);
+        const hr = (x: string) => +/(\d{2}):\d{2}/.exec(x)![1]; const s = hr(d.bestWindow.start), e = hr(d.bestWindow.end);
         expect(s).toBeGreaterThanOrEqual(9); expect(e).toBeLessThanOrEqual(17);
       }
     }

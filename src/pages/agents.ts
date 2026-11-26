@@ -545,14 +545,12 @@ function classify(line: string, state: { inHunk: boolean }): { kind: DiffKind; t
 }
 
 const MARKER: Record<DiffKind, string> = { add: "+", del: "−", ctx: "", hunk: "", meta: "" };
-const WORD: Partial<Record<DiffKind, string>> = { add: "added", del: "removed" };
 
 function diffLine(kind: DiffKind, text: string): HTMLElement {
   // The marker is real text (+ or U+2212) in a span WITHOUT Sable's .diff__mark class, because that class
   // draws the same marker with CSS and it would show twice. See handoff OPEN.
   return h("div", { class: `diff__line diff__line--${kind === "ctx" ? "ctx" : kind}`, testid: "diff-line", "data-kind": kind },
-    h("span", { testid: "diff-marker", "data-marker": MARKER[kind], "aria-hidden": "true" }, MARKER[kind]),
-    WORD[kind] ? h("span", { class: "visually-hidden" }, `${WORD[kind]}: `) : null,
+    h("span", { testid: "diff-marker", "data-marker": MARKER[kind] }, MARKER[kind]),
     h("span", {}, text === "" ? " " : text));
 }
 

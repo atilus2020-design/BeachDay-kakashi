@@ -30,10 +30,10 @@ const blobSha = (content) => sha1(`blob ${Buffer.byteLength(content)}\0${content
 function freshState() {
   return {
     head: INITIAL_HEAD,
-    files: { "docs/notes.md": "# Notes\n", "src/app/today.ts": "export const today = 1;\n" },
+    files: { "docs/notes.md": "# Notes\n", "src/app/today.ts": "export const today = 1;\n", "README.md": "# Beach Day\n", ".env": "SECRET=1\n", "key.pem": "-----BEGIN-----\n" },
     commits: {}, trees: {}, counter: 0,
     forecastStatus: 200, marineStatus: 200, anthropicStatus: 200, githubStatus: 200,
-    supabase: "up", roles: {},
+    supabase: "up", roles: {}, script: [],
   };
 }
 
@@ -61,17 +61,23 @@ export function startMocks(port = 0, host = "127.0.0.1") {
     ["message_delta", { type: "message_delta", delta: { stop_reason: "end_turn", stop_sequence: null }, usage: { output_tokens: 8 } }],
     ["message_stop", { type: "message_stop" }],
   ];
-  const toolEvents = (model, input) => {
-    const json = JSON.stringify(input); const mid = Math.floor(json.length / 2);
+  const toolEvents = (model, tools) => {
+    tools = Array.isArray(tools) ? tools : [{ name: "propose_change", input: tools }];
+    const blocks = tools.flatMap((t, n) => {
+      const json = JSON.stringify(t.input); const mid = Math.floor(json.length / 2); const index = n + 1;
+      return [
+        ["content_block_start", { type: "content_block_start", index, content_block: { type: "tool_use", id: `toolu_mock${index}`, name: t.name, input: {} } }],
+        ["content_block_delta", { type: "content_block_delta", index, delta: { type: "input_json_delta", partial_json: json.slice(0, mid) } }],
+        ["content_block_delta", { type: "content_block_delta", index, delta: { type: "input_json_delta", partial_json: json.slice(mid) } }],
+        ["content_block_stop", { type: "content_block_stop", index }],
+      ];
+    });
     return [
       msgStart(model),
       ["content_block_start", { type: "content_block_start", index: 0, content_block: { type: "text", text: "" } }],
       ["content_block_delta", { type: "content_block_delta", index: 0, delta: { type: "text_delta", text: "Let me draft that change. " } }],
       ["content_block_stop", { type: "content_block_stop", index: 0 }],
-      ["content_block_start", { type: "content_block_start", index: 1, content_block: { type: "tool_use", id: "toolu_mock1", name: "propose_change", input: {} } }],
-      ["content_block_delta", { type: "content_block_delta", index: 1, delta: { type: "input_json_delta", partial_json: json.slice(0, mid) } }],
-      ["content_block_delta", { type: "content_block_delta", index: 1, delta: { type: "input_json_delta", partial_json: json.slice(mid) } }],
-      ["content_block_stop", { type: "content_block_stop", index: 1 }],
+      ...blocks,
       ["message_delta", { type: "message_delta", delta: { stop_reason: "tool_use", stop_sequence: null }, usage: { output_tokens: 40 } }],
       ["message_stop", { type: "message_stop" }],
     ];
@@ -86,6 +92,13 @@ export function startMocks(port = 0, host = "127.0.0.1") {
       return send(res, st.anthropicStatus, { type: "error", error: { type, message: "mock" } });
     }
     const model = body?.model || "claude-sonnet-5-5";
+    // Scripted turns (POST /__state {script:[{tools:[{name,input}]} | {text:[..]} | {status:529}]}): one step per request.
+    const step = st.script.shift();
+    if (step) {
+      if (step.status) return send(res, step.status, { type: "error", error: { type: "overloaded_error", message: "mock" } });
+      if (step.tools) return sse(res, toolEvents(model, step.tools));
+      return sse(res, textEvents(model, step.text || ["ok"]));
+    }
     const last = (body?.messages || []).at(-1) || { content: "" };
     const lb = blocks(last);
     let events;
@@ -105,8 +118,13 @@ export function startMocks(port = 0, host = "127.0.0.1") {
     if (st.githubStatus !== 200) return send(res, st.githubStatus, { message: "mock failure" });
     const rest = m[3];
     let r;
-    if (req.method === "GET" && (r = /^contents\/(.+)$/.exec(rest))) {
-      const p = decodeURIComponent(r[1]);
+    if (req.method === "GET" && (rest === "contents" || (r = /^contents\/(.+)$/.exec(rest)))) {
+      const p = rest === "contents" ? "" : decodeURIComponent(r[1]);
+      if (p === "" || (!(p in st.files) && Object.keys(st.files).some((f) => f.startsWith(p + "/")))) {
+        const pre = p ? p + "/" : ""; const seen = new Map();
+        for (const f of Object.keys(st.files)) if (f.startsWith(pre)) { const name = f.slice(pre.length).split("/")[0]; const isDir = f.slice(pre.length).includes("/"); seen.set(name, isDir ? { name, path: pre + name, type: "dir", size: 0 } : { name, path: pre + name, type: "file", size: Buffer.byteLength(st.files[f]) }); }
+        return send(res, 200, [...seen.values()]);
+      }
       if (!(p in st.files)) return send(res, 404, { message: "Not Found" });
       const c = st.files[p];
       return send(res, 200, { type: "file", path: p, name: p.split("/").pop(), encoding: "base64", content: Buffer.from(c).toString("base64"), sha: blobSha(c), size: Buffer.byteLength(c) });

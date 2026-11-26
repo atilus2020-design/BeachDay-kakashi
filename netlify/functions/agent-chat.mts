@@ -82,15 +82,14 @@ export default async (req: Request, ctx: Context) => {
           open = false;
         }
       };
-      let tokens = 0;
+      const usage = { tokens: 0 }; // filled by every round, even one cut off by abort or an error
       let outcome = "error";
       try {
-        const r = await runChatTurn(messages, { agent, user, ctx, signal: abort.signal, deadline: started + DEADLINE_MS }, {
+        const r = await runChatTurn(messages, { agent, user, ctx, signal: abort.signal, deadline: started + DEADLINE_MS, usage }, {
           text: (t) => send("text", t),
           tool: (info) => send("tool", info),
           proposal: (p) => send("proposal", p),
         });
-        tokens = r.tokens;
         outcome = r.stop_reason;
         send("done", { stop_reason: r.stop_reason });
       } catch (e) {
@@ -108,11 +107,11 @@ export default async (req: Request, ctx: Context) => {
       } finally {
         clearTimeout(timer);
         try {
-          await recordTokens(user.id, tokens);
+          await recordTokens(user.id, usage.tokens);
         } catch {
           /* budget write failure must not break the stream */
         }
-        await audit(ctx, user, "chat", agent.name, { tokens, outcome, ms: Date.now() - started });
+        await audit(ctx, user, "chat", agent.name, { tokens: usage.tokens, outcome, ms: Date.now() - started });
         open = false;
         try {
           controller.close(); // close last, so the bookkeeping runs before the platform freezes the Function

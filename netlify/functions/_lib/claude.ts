@@ -104,6 +104,8 @@ export interface TurnContext {
   ctx?: Partial<Context>;
   signal: AbortSignal;
   deadline: number; // epoch ms
+  /** Mutable counter: tokens of every round, including a round cut off by abort or error (budget can't be dodged). */
+  usage: { tokens: number };
 }
 
 type ToolResult = { type: "tool_result"; tool_use_id: string; content: string; is_error?: boolean };
@@ -191,7 +193,7 @@ export async function createProposal(input: any, tc: TurnContext): Promise<{ id:
 
 // ---------------------------------------------------------------- the turn
 
-export interface TurnResult { stop_reason: string; tokens: number }
+export interface TurnResult { stop_reason: string }
 
 /**
  * One chat turn: stream the model, run tools (≤ MAX_TOOL_ROUNDS rounds), return the final stop reason.
@@ -205,12 +207,11 @@ export async function runChatTurn(
   const client = getClaude();
   const convo: any[] = messages.map((m) => ({ role: m.role, content: m.content }));
   const fallbackOk = tc.agent.model !== "claude-haiku-5-5"; // Haiku 5.5 has no server-side fallback
-  let tokens = 0;
   let proposed = false;
 
   for (let round = 0; ; round++) {
     const remaining = tc.deadline - Date.now();
-    if (remaining < 5_000) return { stop_reason: "time_limit", tokens };
+    if (remaining < 5_000) return { stop_reason: "time_limit" };
     const params: any = {
       model: tc.agent.model,
       max_tokens: MAX_TOKENS_PER_ROUND,
@@ -225,12 +226,21 @@ export async function runChatTurn(
     };
     const stream = client.beta.messages.stream(params, { signal: tc.signal, timeout: remaining, maxRetries: 0 });
     stream.on("text", (t: string) => cb.text(t));
-    const final: any = await stream.finalMessage();
-    tokens += usageTokens(final.usage);
+    let final: any;
+    try {
+      final = await stream.finalMessage();
+    } catch (e) {
+      // Count what this round already used (message_start input tokens, output so far), then rethrow.
+      // If the cut came before message_start, charge an estimate of the input (~4 chars per token), never 0.
+      const reported = usageTokens(stream.currentMessage?.usage);
+      tc.usage.tokens += reported > 0 ? reported : Math.ceil((tc.agent.system.length + JSON.stringify(convo).length) / 4);
+      throw e;
+    }
+    tc.usage.tokens += usageTokens(final.usage);
 
-    if (final.stop_reason === "refusal") return { stop_reason: "refusal", tokens };
-    if (final.stop_reason !== "tool_use") return { stop_reason: String(final.stop_reason ?? "end_turn"), tokens };
-    if (round >= MAX_TOOL_ROUNDS) return { stop_reason: "tool_limit", tokens };
+    if (final.stop_reason === "refusal") return { stop_reason: "refusal" };
+    if (final.stop_reason !== "tool_use") return { stop_reason: String(final.stop_reason ?? "end_turn") };
+    if (round >= MAX_TOOL_ROUNDS) return { stop_reason: "tool_limit" };
 
     const uses = (final.content as any[]).filter((b) => b?.type === "tool_use");
     convo.push({ role: "assistant", content: final.content });

@@ -33,10 +33,20 @@ async function acquireLock(owner: string): Promise<boolean> {
   return (await locks.setJSON(LOCK_KEY, value, { onlyIfMatch: cur.etag })).modified; // take over an expired lock
 }
 
+/**
+ * Release only our own lock. Blobs has no conditional delete, so we first overwrite it with an
+ * already-expired marker using onlyIfMatch on our etag (a lock taken over by someone else is left alone),
+ * then delete the marker.
+ */
 async function releaseLock(owner: string): Promise<void> {
   const locks = store("locks");
-  const cur = await locks.get(LOCK_KEY, { type: "json" });
-  if (cur?.owner === owner) await locks.delete(LOCK_KEY);
+  const cur = await locks.getWithMetadata(LOCK_KEY, { type: "json" });
+  if (!cur || cur.data?.owner !== owner) return;
+  const w = await locks.setJSON(LOCK_KEY, { owner: null, at: new Date(0).toISOString() }, { onlyIfMatch: cur.etag });
+  if (w.modified) {
+    const after = await locks.getWithMetadata(LOCK_KEY, { type: "json" });
+    if (after && after.etag === w.etag) await locks.delete(LOCK_KEY);
+  }
 }
 
 export default async (req: Request, ctx: Context) => {
@@ -110,15 +120,21 @@ export default async (req: Request, ctx: Context) => {
       return json(502, { error: "GitHub is unavailable, try again later" });
     }
 
-    const { approving: _drop, ...rest } = p;
-    const done = await proposals.setJSON(
-      key,
-      { ...rest, status: "approved", decidedAt: new Date().toISOString(), decidedBy: { id: user.id, email: user.email }, commit },
-      { onlyIfMatch: flagged },
-    );
+    // Committed: never undo the claim from here on, and record the commit before anything else can fail.
+    const claimEtag = flagged;
     flagged = undefined;
-    if (!done.modified) console.error("approve: status CAS failed after commit", id); // the lock + claim make this unexpected
     await audit(ctx, user, "proposal.approve", id, { commit: commit.sha });
+    try {
+      const { approving: _drop, ...rest } = p;
+      const done = await proposals.setJSON(
+        key,
+        { ...rest, status: "approved", decidedAt: new Date().toISOString(), decidedBy: { id: user.id, email: user.email }, commit },
+        { onlyIfMatch: claimEtag },
+      );
+      if (!done.modified) console.error("approve: status CAS failed after commit", id); // lock + claim make this unexpected
+    } catch {
+      console.error("approve: status write failed after commit", id); // the commit stands; the audit entry has its sha
+    }
     return json(200, { status: "approved", commit, deploy: "started" });
   } catch (e) {
     console.error("approve failed", (e as Error)?.name ?? "error");

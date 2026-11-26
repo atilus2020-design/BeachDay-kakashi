@@ -186,7 +186,7 @@ function strip(v: View): HTMLElement {
       h("span", { class: `score--${d.label}` }, icon(ICON[d.label], 20)),
       h("span", { class: `day-strip__score score--${d.label}` }, String(d.score)),
       h("span", { class: "text-2" }, SHORT[d.label]),
-      d.lowConfidence ? h("span", { class: "text-2", testid: "low-confidence-badge" }, h("span", { "aria-hidden": "true" }, "~"), h("span", { class: "visually-hidden" }, "Lower confidence")) : null,
+      d.lowConfidence ? h("span", { class: "text-2", testid: "low-confidence-badge" }, "Lower confidence") : null,
     );
     wrap.append(cell);
   });

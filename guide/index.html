@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Setup and deploy guide</title>
+  <title>Guide · Beach Day</title>
   <meta name="description" content="Step-by-step guide to run Beach Day locally with mocks, create its Supabase project and Google sign-in, deploy it to Netlify and make the first super_admin.">
   <link rel="manifest" href="/manifest.webmanifest">
   <meta name="theme-color" content="#0b3d5c">
@@ -22,151 +22,201 @@
     </nav>
   </noscript>
 
-  <main class="page content">
-    <h1>Setup and deploy guide</h1>
+  <main id="main" class="page content">
+    <h1 data-testid="page-title">Setup and deploy guide</h1>
     <p>This guide takes you from a fresh copy of Beach Day to a live site with sign-in and the Agents page. Plan for about an hour the first time. You need a GitHub account, a Netlify account and a Supabase account. The Free plans of all three are enough.</p>
     <p>Never paste a real secret key, token or password into a chat, an issue, or this repository. Put them only in the places this guide names.</p>
+    <p class="copy-status" role="status" aria-live="polite" data-testid="guide-copy-status"></p>
 
-    <h2>Part 1: Run it on your computer with mocks</h2>
-    <p>Mocks are fake upstream services, so you can run the app without any real keys. You need Node.js 20 or later and Git.</p>
-    <ol>
-      <li>On GitHub, open the <a href="https://github.com/atilus2020-design/BeachDay-kakashi" rel="noopener">Beach Day repository</a>, then click <strong>Fork</strong>.</li>
-      <li>In a terminal, clone your fork. Replace <code>&lt;your-user&gt;</code> with your GitHub user name:
-        <pre><code>git clone https://github.com/&lt;your-user&gt;/BeachDay-kakashi.git
+    <section data-testid="guide-step">
+      <h2>Part 1: Run it on your computer with mocks</h2>
+      <p>Mocks are fake upstream services, so you can run the app without any real keys. You need Node.js 20 or later and Git.</p>
+      <ol>
+        <li>On GitHub, open the <a href="https://github.com/atilus2020-design/BeachDay-kakashi" target="_blank" rel="noopener noreferrer">Beach Day repository</a>, then click <strong>Fork</strong>.</li>
+        <li>In a terminal, clone your fork and install the packages. Replace <code>&lt;your-user&gt;</code> with your GitHub user name:
+          <pre data-testid="guide-code"><code>git clone https://github.com/&lt;your-user&gt;/BeachDay-kakashi.git
 cd BeachDay-kakashi
-npm install</code></pre>
-      </li>
-      <li>In the first terminal, start the mock services and leave them running:
-        <pre><code>npm run mocks</code></pre>
-      </li>
-      <li>In a second terminal, in the same folder, load the test settings and start the app:
-        <pre><code>set -a; source tests/mocks/test.env; set +a
+npm install
+npm run build:agents</code></pre>
+          <button type="button" data-testid="guide-copy-button">Copy</button>
+        </li>
+        <li>In the first terminal, start the mock services and leave them running. They listen on <code>http://127.0.0.1:9100</code>:
+          <pre data-testid="guide-code"><code>npm run mocks</code></pre>
+          <button type="button" data-testid="guide-copy-button">Copy</button>
+        </li>
+        <li>In a second terminal, in the same folder, load the test settings and start the app:
+          <pre data-testid="guide-code"><code>set -a; source tests/mocks/test.env; set +a
 npm run dev</code></pre>
-      </li>
-      <li>Open <code>http://localhost:8888</code> in your browser. You should see the beach picker and a score.</li>
-    </ol>
+          <button type="button" data-testid="guide-copy-button">Copy</button>
+        </li>
+        <li>Open <code>http://localhost:8888</code> in your browser. You should see the beach picker and a score.</li>
+      </ol>
+      <p>If <code>npm run dev</code> stops with <code>fetch failed</code> after it loads the functions, use the offline form that the browser tests use. It does not need access to Netlify:</p>
+      <pre data-testid="guide-code"><code>set -a; source tests/mocks/test.env; set +a
+npx netlify dev --offline --port 8888</code></pre>
+      <button type="button" data-testid="guide-copy-button">Copy</button>
+    </section>
 
-    <h2>Part 2: Create the Supabase project</h2>
-    <p>Supabase provides sign-in and the roles table. Create the project in the Supabase dashboard.</p>
-    <ol>
-      <li>Go to <a href="https://supabase.com/dashboard" rel="noopener">supabase.com/dashboard</a>, click <strong>New project</strong>, and choose a name, a region near Florida and a database password. Save the password in a password manager. Wait until the project is ready.</li>
-      <li>Open <strong>Project Settings → API Keys</strong>. Copy the <strong>Project URL</strong> and the <strong>publishable key</strong>. Keep them for Part 5. Do not copy any secret key.</li>
-      <li>Open <strong>Authentication → Sign In / Providers → Email</strong>. Turn on <strong>Email</strong> and <strong>Confirm email</strong>, and set the minimum password length to <strong>12</strong>. Save.</li>
-      <li>Open <strong>Authentication → URL Configuration</strong>. Set <strong>Site URL</strong> to your production address, for example <code>https://your-site.netlify.app</code>. You can change it once Netlify gives you the address in Part 4.</li>
-      <li>In <strong>Redirect URLs</strong>, add exactly these two entries, and no others. Replace the host with your site address:
-        <pre><code>https://your-site.netlify.app/login/
+    <section data-testid="guide-step">
+      <h2>Part 2: Create the Supabase project</h2>
+      <p>Supabase provides sign-in and the roles table. Create the project in the Supabase dashboard.</p>
+      <ol>
+        <li>Go to <a href="https://supabase.com/dashboard" target="_blank" rel="noopener noreferrer">supabase.com/dashboard</a>, click <strong>New project</strong>, and choose a name, a region near Florida and a database password. Save the password in a password manager. Wait until the project is ready.</li>
+        <li>Open <strong>Project Settings → API Keys</strong>. Copy the <strong>Project URL</strong> and the <strong>publishable key</strong>. Keep them for Part 6. Do not copy any secret key.</li>
+        <li>Open <strong>Authentication → Sign In / Providers → Email</strong>. Turn on <strong>Email</strong> and <strong>Confirm email</strong>, and set the minimum password length to <strong>12</strong>. Save.</li>
+        <li>Open <strong>Authentication → URL Configuration</strong>. Set <strong>Site URL</strong> to your production address, for example <code>https://your-site.netlify.app</code>. You can change it once Netlify gives you the address in Part 4.</li>
+        <li>In <strong>Redirect URLs</strong>, add exactly these two entries, and no others. Replace the host with your site address:
+          <pre data-testid="guide-code"><code>https://your-site.netlify.app/login/
 https://your-site.netlify.app/login/reset/</code></pre>
-        <p>Do not use wildcards (<code>**</code>). Do not add <code>localhost</code> to this production project. For local sign-in, use a separate development Supabase project.</p>
-      </li>
-      <li>Open <strong>SQL Editor</strong>, click <strong>New query</strong>, paste the contents of each file in the <code>supabase/migrations/</code> folder in the repository, in name order, and click <strong>Run</strong>. The migration creates the <code>profiles</code> table, its row security rules and the sign-up trigger.</li>
-    </ol>
+          <button type="button" data-testid="guide-copy-button">Copy</button>
+          <p>Do not use wildcards (<code>**</code>). Do not add <code>localhost</code> to this production project. For local sign-in, use a separate development Supabase project.</p>
+        </li>
+        <li>Open <strong>SQL Editor</strong>, click <strong>New query</strong>, paste the contents of each file in the <code>supabase/migrations/</code> folder in the repository, in name order, and click <strong>Run</strong>. The migration creates the <code>profiles</code> table, its row security rules and the sign-up trigger.</li>
+      </ol>
+    </section>
 
-    <h2>Part 3: Set up Google sign-in (optional but recommended)</h2>
-    <p>Skip this part if you want email sign-in only. The Agents page works with either.</p>
-    <ol>
-      <li>Go to the <a href="https://console.cloud.google.com/" rel="noopener">Google Cloud Console</a>. Create a project if you do not have one, then open <strong>APIs &amp; Services → Credentials</strong>.</li>
-      <li>Click <strong>Create credentials → OAuth client ID</strong>. Choose <strong>Web application</strong>.</li>
-      <li>Under <strong>Authorized JavaScript origins</strong>, add only your site origin, for example <code>https://your-site.netlify.app</code>.</li>
-      <li>Under <strong>Authorized redirect URIs</strong>, add only the Supabase callback. Replace <code>&lt;project-ref&gt;</code> with the reference in your Project URL:
-        <pre><code>https://&lt;project-ref&gt;.supabase.co/auth/v1/callback</code></pre>
-      </li>
-      <li>Click <strong>Create</strong>. Copy the client ID and the client secret.</li>
-      <li>In Supabase, open <strong>Authentication → Sign In / Providers → Google</strong>. Turn it on, paste the client ID and the client secret, and save. The client secret goes only into Supabase. Never put it in Netlify or in the repository.</li>
-    </ol>
-    <p>For the Google sign-in details, see the <a href="https://supabase.com/docs/guides/auth/social-login/auth-google" rel="noopener">Supabase Google guide</a>.</p>
+    <section data-testid="guide-step">
+      <h2>Part 3: Set up Google sign-in (optional but recommended)</h2>
+      <p>Skip this part if you want email sign-in only. The Agents page works with either.</p>
+      <ol>
+        <li>Go to the <a href="https://console.cloud.google.com/" target="_blank" rel="noopener noreferrer">Google Cloud Console</a>. Create a project if you do not have one, then open <strong>APIs &amp; Services → Credentials</strong>.</li>
+        <li>Click <strong>Create credentials → OAuth client ID</strong>. Choose <strong>Web application</strong>.</li>
+        <li>Under <strong>Authorized JavaScript origins</strong>, add only your site origin, for example <code>https://your-site.netlify.app</code>.</li>
+        <li>Under <strong>Authorized redirect URIs</strong>, add only the Supabase callback. Replace <code>&lt;project-ref&gt;</code> with the reference in your Project URL:
+          <pre data-testid="guide-code"><code>https://&lt;project-ref&gt;.supabase.co/auth/v1/callback</code></pre>
+          <button type="button" data-testid="guide-copy-button">Copy</button>
+        </li>
+        <li>Click <strong>Create</strong>. Copy the client ID and the client secret.</li>
+        <li>In Supabase, open <strong>Authentication → Sign In / Providers → Google</strong>. Turn it on, paste the client ID and the client secret, and save. The client secret goes only into Supabase. Never put it in Netlify or in the repository.</li>
+      </ol>
+      <p>For the Google sign-in details, see the <a href="https://supabase.com/docs/guides/auth/social-login/auth-google" target="_blank" rel="noopener noreferrer">Supabase Google guide</a>.</p>
+    </section>
 
-    <h2>Part 4: Create the Netlify site from GitHub</h2>
-    <ol>
-      <li>Sign in at <a href="https://app.netlify.com" rel="noopener">app.netlify.com</a> and click <strong>Add new project → Import an existing project</strong>.</li>
-      <li>Choose <strong>GitHub</strong>, authorise Netlify if asked, and select your fork of <code>BeachDay-kakashi</code>.</li>
-      <li>Leave the build settings as Netlify reads them from <code>netlify.toml</code>: build command <code>npm run build</code> and publish directory <code>dist</code>.</li>
-      <li>Click <strong>Deploy</strong>. The first deploy may fail until you add the variables in Part 6. That is expected.</li>
-      <li>Copy your site address (it ends in <code>.netlify.app</code>). Go back to Supabase Part 2, step 4, and set the Site URL and the redirect URLs to this address.</li>
-    </ol>
+    <section data-testid="guide-step">
+      <h2>Part 4: Create the Netlify site from GitHub</h2>
+      <ol>
+        <li>Sign in at <a href="https://app.netlify.com" target="_blank" rel="noopener noreferrer">app.netlify.com</a> and click <strong>Add new project → Import an existing project</strong>.</li>
+        <li>Choose <strong>GitHub</strong>, authorise Netlify if asked, and select your fork of <code>BeachDay-kakashi</code>.</li>
+        <li>Leave the build settings as Netlify reads them from <code>netlify.toml</code>: build command <code>npm run build</code> and publish directory <code>dist</code>.</li>
+        <li>Click <strong>Deploy</strong>. The first deploy may fail until you add the variables in Part 6. That is expected.</li>
+        <li>Copy your site address (it ends in <code>.netlify.app</code>). Go back to Supabase Part 2, step 4, and set the Site URL and the redirect URLs to this address.</li>
+      </ol>
+    </section>
 
-    <h2>Part 5: Create the GitHub token</h2>
-    <p>Beach Day commits approved changes with a fine-grained personal access token. The token can reach only this one repository.</p>
-    <ol>
-      <li>On GitHub, click your profile photo, then <strong>Settings → Developer settings → Personal access tokens → Fine-grained tokens</strong>. Click <strong>Generate new token</strong>.</li>
-      <li>Set <strong>Resource owner</strong> to your account. Under <strong>Repository access</strong>, choose <strong>Only select repositories</strong> and pick your fork.</li>
-      <li>Under <strong>Permissions</strong>, set <strong>Contents</strong> to <strong>Read and write</strong> and <strong>Metadata</strong> to <strong>Read-only</strong>. Set nothing else. In particular, do not add the Workflows permission.</li>
-      <li>Set an expiry, for example 90 days, and add a reminder to rotate it before then.</li>
-      <li>Click <strong>Generate token</strong> and copy it now. GitHub shows it only once. You will paste it into Netlify in Part 6.</li>
-    </ol>
-    <p>For more detail, see the <a href="https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens" rel="noopener">GitHub guide to fine-grained tokens</a>.</p>
+    <section data-testid="guide-step">
+      <h2>Part 5: Create the GitHub token</h2>
+      <p>Beach Day commits approved changes with a fine-grained personal access token. The token can reach only this one repository.</p>
+      <ol>
+        <li>On GitHub, click your profile photo, then <strong>Settings → Developer settings → Personal access tokens → Fine-grained tokens</strong>. Click <strong>Generate new token</strong>.</li>
+        <li>Set <strong>Resource owner</strong> to your account. Under <strong>Repository access</strong>, choose <strong>Only select repositories</strong> and pick your fork.</li>
+        <li>Under <strong>Permissions</strong>, set <strong>Contents</strong> to <strong>Read and write</strong> and <strong>Metadata</strong> to <strong>Read-only</strong>. Set nothing else. In particular, do not add the Workflows permission.</li>
+        <li>Set an expiry, for example 90 days, and add a reminder to rotate it before then.</li>
+        <li>Click <strong>Generate token</strong> and copy it now. GitHub shows it only once. You will paste it into Netlify in Part 6.</li>
+      </ol>
+      <p>For more detail, see the <a href="https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens" target="_blank" rel="noopener noreferrer">GitHub guide to fine-grained tokens</a>.</p>
+    </section>
 
-    <h2>Part 6: Set the environment variables in Netlify</h2>
-    <p>Netlify reads these values at build time and when functions run. Set each one in the Netlify UI, never in a file in the repository.</p>
-    <ol>
-      <li>In your Netlify site, open <strong>Site configuration → Environment variables</strong>.</li>
-      <li>For each row in the table below, click <strong>Add a variable</strong>, enter the name and value, and choose the scope and context shown. Use your own values. The example formats are fake.</li>
-      <li>Click <strong>Save</strong> after the last variable.</li>
-      <li>Open <strong>Deploys</strong>, then click <strong>Trigger deploy → Deploy site</strong>. Variables take effect only in a new deploy.</li>
-    </ol>
-    <table>
-      <thead>
-        <tr><th scope="col">Name</th><th scope="col">Scope and context</th><th scope="col">Example format (fake)</th><th scope="col">Purpose</th></tr>
-      </thead>
-      <tbody>
-        <tr><th scope="row"><code>ANTHROPIC_API_KEY</code></th><td>Functions, all contexts. Use a key with a spending limit.</td><td><code>sk-ant-…</code></td><td>Calls Claude for the Agents page</td></tr>
-        <tr><th scope="row"><code>GITHUB_TOKEN</code></th><td>Functions, Production context only</td><td><code>github_pat_…</code></td><td>Commits approved changes (Part 5)</td></tr>
-        <tr><th scope="row"><code>GITHUB_REPO</code></th><td>Functions</td><td><code>your-user/BeachDay-kakashi</code></td><td>The repository the token may change</td></tr>
-        <tr><th scope="row"><code>SUPABASE_URL</code></th><td>Functions</td><td><code>https://&lt;ref&gt;.supabase.co</code></td><td>Your Supabase Project URL (Part 2)</td></tr>
-        <tr><th scope="row"><code>SUPABASE_PUBLISHABLE_KEY</code></th><td>Functions</td><td><code>sb_publishable_…</code></td><td>Your Supabase publishable key (Part 2)</td></tr>
-        <tr><th scope="row"><code>VITE_SUPABASE_URL</code></th><td>Builds</td><td><code>https://&lt;ref&gt;.supabase.co</code></td><td>The same Project URL, for the browser build</td></tr>
-        <tr><th scope="row"><code>VITE_SUPABASE_PUBLISHABLE_KEY</code></th><td>Builds</td><td><code>sb_publishable_…</code></td><td>The same publishable key, for the browser build</td></tr>
-        <tr><th scope="row"><code>DAILY_CHAT_LIMIT</code></th><td>Functions</td><td><code>200</code></td><td>Chat messages allowed per user and in total each day</td></tr>
-        <tr><th scope="row"><code>DAILY_TOKEN_LIMIT</code></th><td>Functions</td><td><code>2000000</code></td><td>Claude tokens allowed per user and in total each day</td></tr>
-      </tbody>
-    </table>
-    <p>Do not set <code>OPEN_METEO_BASE</code>, <code>ANTHROPIC_BASE_URL</code> or <code>GITHUB_API_URL</code> in Netlify. They are for local tests only. Never set a Supabase secret key, a <code>service_role</code> key, a JWT secret, <code>CONSOLE_PASSWORD_HASH</code> or <code>SESSION_SECRET</code>. The build fails if it finds them.</p>
+    <section data-testid="guide-step">
+      <h2>Part 6: Set the environment variables in Netlify</h2>
+      <p>Netlify reads these values at build time and when functions run. Set each one in the Netlify UI, never in a file in the repository.</p>
+      <ol>
+        <li>In your Netlify site, open <strong>Site configuration → Environment variables</strong>.</li>
+        <li>For each row in the table below, click <strong>Add a variable</strong>, enter the name and value, and choose the scope and context shown. Use your own values. The example formats are fake.</li>
+        <li>Click <strong>Save</strong> after the last variable.</li>
+        <li>Open <strong>Deploys</strong>, then click <strong>Trigger deploy → Deploy site</strong>. Variables take effect only in a new deploy.</li>
+      </ol>
+      <table>
+        <thead>
+          <tr><th scope="col">Name</th><th scope="col">Scope and context</th><th scope="col">Example format (fake)</th><th scope="col">Purpose</th></tr>
+        </thead>
+        <tbody>
+          <tr><th scope="row"><code>ANTHROPIC_API_KEY</code></th><td>Functions, all contexts. Use a key with a spending limit.</td><td><code>sk-ant-…</code></td><td>Calls Claude for the Agents page</td></tr>
+          <tr><th scope="row"><code>GITHUB_TOKEN</code></th><td>Functions, Production context only</td><td><code>github_pat_…</code></td><td>Commits approved changes (Part 5)</td></tr>
+          <tr><th scope="row"><code>GITHUB_REPO</code></th><td>Functions</td><td><code>your-user/BeachDay-kakashi</code></td><td>The repository the token may change</td></tr>
+          <tr><th scope="row"><code>SUPABASE_URL</code></th><td>Functions</td><td><code>https://&lt;ref&gt;.supabase.co</code></td><td>Your Supabase Project URL (Part 2)</td></tr>
+          <tr><th scope="row"><code>SUPABASE_PUBLISHABLE_KEY</code></th><td>Functions</td><td><code>sb_publishable_…</code></td><td>Your Supabase publishable key (Part 2)</td></tr>
+          <tr><th scope="row"><code>VITE_SUPABASE_URL</code></th><td>Builds</td><td><code>https://&lt;ref&gt;.supabase.co</code></td><td>The same Project URL, for the browser build</td></tr>
+          <tr><th scope="row"><code>VITE_SUPABASE_PUBLISHABLE_KEY</code></th><td>Builds</td><td><code>sb_publishable_…</code></td><td>The same publishable key, for the browser build</td></tr>
+          <tr><th scope="row"><code>DAILY_CHAT_LIMIT</code></th><td>Functions</td><td><code>200</code></td><td>Chat messages allowed per user and in total each day</td></tr>
+          <tr><th scope="row"><code>DAILY_TOKEN_LIMIT</code></th><td>Functions</td><td><code>2000000</code></td><td>Claude tokens allowed per user and in total each day</td></tr>
+        </tbody>
+      </table>
+      <p>Do not set these local-only variables in Netlify: <code>OPEN_METEO_BASE</code>, <code>OPEN_METEO_MARINE_BASE</code>, <code>ANTHROPIC_BASE_URL</code> or <code>GITHUB_API_URL</code>. They point the app at the local mocks. Never set a Supabase secret key, a <code>service_role</code> key, a JWT secret, <code>CONSOLE_PASSWORD_HASH</code> or <code>SESSION_SECRET</code>. The build fails if it finds a Supabase secret or service-role key.</p>
+    </section>
 
-    <h2>Part 7: Check the deploy</h2>
-    <ol>
-      <li>Open <strong>Deploys</strong> in Netlify and wait until the latest deploy shows <strong>Published</strong>.</li>
-      <li>Open your site address. The beach picker and the score should load.</li>
-      <li>If the deploy failed, open its log. A missing variable is the most common cause. Check Part 6, then trigger a new deploy.</li>
-    </ol>
+    <section data-testid="guide-step">
+      <h2>Part 7: Check the deploy</h2>
+      <ol>
+        <li>Open <strong>Deploys</strong> in Netlify and wait until the latest deploy shows <strong>Published</strong>.</li>
+        <li>Open your site address. The beach picker and the score should load.</li>
+        <li>If the deploy failed, open its log. A missing variable is the most common cause. Check Part 6, then trigger a new deploy.</li>
+      </ol>
+    </section>
 
-    <h2>Part 8: Sign up and become super_admin</h2>
-    <p>Anyone can create an account, but only one account is the super_admin. You make that account by hand.</p>
-    <ol>
-      <li>Open <code>https://your-site.netlify.app/login/</code> and choose <strong>Sign up</strong>. Enter your email and a password of at least 12 characters.</li>
-      <li>Open the confirmation email and click the link. The email comes from Supabase, and the built-in email service sends only 2 emails an hour. If you hit that limit, wait an hour, or set up custom SMTP in Supabase.</li>
-      <li>In Supabase, open <strong>SQL Editor</strong>, click <strong>New query</strong>, and run this. Replace the email with the one you signed up with:
-        <pre><code>update public.profiles set role = 'super_admin'
-where email = 'you@example.com';</code></pre>
-      </li>
-      <li>Sign out and sign in again. The Agents page should now open.</li>
-    </ol>
-    <p>To remove someone's access, run the same statement with <code>role = 'user'</code>. Keep the number of super_admin accounts to one unless you decide otherwise.</p>
+    <section data-testid="guide-step">
+      <h2>Part 8: Sign up and become super_admin</h2>
+      <p>Anyone can create an account, but only one account is the super_admin. You make that account by hand.</p>
+      <ol>
+        <li>Open <code>https://your-site.netlify.app/login/</code> and choose <strong>Sign up</strong>. Enter your email and a password of at least 12 characters.</li>
+        <li>Open the confirmation email and click the link. The email comes from Supabase, and the built-in email service sends only 2 emails an hour. If you hit that limit, wait an hour, or set up custom SMTP in Supabase.</li>
+        <li>In Supabase, open <strong>SQL Editor</strong>, click <strong>New query</strong>, and run this. Replace <code>you@example.com</code> with the email you signed up with. The statement is the promotion SQL from the migration, which only works once the email is confirmed:
+          <pre data-testid="guide-code"><code>update public.profiles p set role = 'super_admin'
+from auth.users u
+where p.id = u.id and u.email = 'you@example.com' and u.email_confirmed_at is not null;</code></pre>
+          <button type="button" data-testid="guide-copy-button">Copy</button>
+        </li>
+        <li>Check that the result says <code>UPDATE 1</code>. Any other count means the email is wrong or not yet confirmed.</li>
+        <li>Sign out and sign in again. The Agents page should now open.</li>
+      </ol>
+      <p>To remove someone's access, run the same kind of statement with <code>role = 'user'</code>. Keep the number of super_admin accounts to one unless you decide otherwise.</p>
+    </section>
 
-    <h2>Part 9: Smoke test</h2>
-    <ol>
-      <li>Open the home page and pick a beach. Check that a score, a label and a reason appear.</li>
-      <li>Open <code>/how-it-works/</code> and <code>/resources/</code>. Both should load with the footer.</li>
-      <li>Open <code>/agents/</code> as the super_admin. The agent list should load.</li>
-      <li>Optional: install the app on your phone from the browser's share menu.</li>
-    </ol>
+    <section data-testid="guide-step">
+      <h2>Part 9: Smoke test</h2>
+      <div data-testid="guide-check">
+        <ol>
+          <li>Open the home page and pick a beach. Check that a score, a label and a reason appear.</li>
+          <li>Open <code>/api/forecast?beach=south-beach</code>. It should return JSON with status 200.</li>
+          <li>Open <code>/how-it-works/</code> and <code>/resources/</code>. Both should load with the footer.</li>
+          <li>Open <code>/agents/</code> as the super_admin. The agent list should load.</li>
+          <li>Optional: install the app on your phone from the browser's share menu.</li>
+        </ol>
+      </div>
+    </section>
 
-    <h2>Part 10: Rotate secrets</h2>
-    <ol>
-      <li>GitHub token: create a new fine-grained token with the same settings (Part 5), replace <code>GITHUB_TOKEN</code> in Netlify, trigger a deploy, then delete the old token in GitHub.</li>
-      <li>Anthropic key: create a new key in the Anthropic console, replace <code>ANTHROPIC_API_KEY</code> in Netlify, trigger a deploy, then revoke the old key.</li>
-      <li>If you think a secret leaked: revoke it at its source first, then follow the steps above. Check the GitHub commit history for anything you did not expect.</li>
-    </ol>
+    <section data-testid="guide-step">
+      <h2>Part 10: Rotate secrets</h2>
+      <ol>
+        <li>GitHub token: create a new fine-grained token with the same settings (Part 5), replace <code>GITHUB_TOKEN</code> in Netlify, trigger a deploy, then delete the old token in GitHub.</li>
+        <li>Anthropic key: create a new key in the Anthropic console, replace <code>ANTHROPIC_API_KEY</code> in Netlify, trigger a deploy, then revoke the old key.</li>
+        <li>If you think a secret leaked: revoke it at its source first, then follow the steps above. Check the GitHub commit history for anything you did not expect.</li>
+      </ol>
+    </section>
+
+    <section data-testid="guide-troubleshooting">
+      <h2>If something goes wrong</h2>
+      <ul>
+        <li><strong>The deploy fails.</strong> Open its log. A missing variable is the most common cause. Check Part 6, then trigger a new deploy.</li>
+        <li><strong>Local run stops with <code>fetch failed</code>.</strong> Use the offline command from Part 1: <code>npx netlify dev --offline --port 8888</code>.</li>
+        <li><strong>Sign-in or the reset link fails.</strong> Check that the Redirect URLs in Supabase match your site address exactly, including the <code>/login/</code> and <code>/login/reset/</code> paths and no trailing wildcard.</li>
+        <li><strong>Sign-in fails after a long pause.</strong> A Free Supabase project is paused after one week without activity. Restore it from the Supabase dashboard. Read <a href="https://supabase.com/docs/guides/platform/free-project-pausing" target="_blank" rel="noopener noreferrer">Supabase on pausing free projects</a>.</li>
+        <li><strong>No confirmation email arrives.</strong> The built-in email service sends 2 emails an hour. Wait, or set up custom SMTP in Supabase.</li>
+        <li><strong>The Agents page says you have no access.</strong> Only the <code>super_admin</code> account can open it. Check Part 8, then sign out and sign in again.</li>
+      </ul>
+    </section>
 
     <h2>Free plan notes</h2>
     <ul>
-      <li><strong>Supabase pauses idle projects.</strong> A Free project is paused after one week without activity. When it is paused, sign-in and the Agents page fail, but the public beach pages still work. Restore the project from the Supabase dashboard. Read <a href="https://supabase.com/docs/guides/platform/free-project-pausing" rel="noopener">Supabase on pausing free projects</a>.</li>
-      <li><strong>Supabase email limit.</strong> The built-in email service sends 2 emails an hour, which covers sign-up confirmations and password resets for a small group. For more, configure custom SMTP. See <a href="https://supabase.com/docs/guides/auth/rate-limits" rel="noopener">Supabase Auth rate limits</a>.</li>
-      <li><strong>Netlify credits.</strong> Each approved change triggers one build, and builds use Free plan credits. Keep builds rare. The <a href="https://docs.netlify.com/manage/security/secure-access-to-sites/rate-limiting/" rel="noopener">Netlify rate limiting guide</a> explains how request limits apply.</li>
+      <li><strong>Supabase pauses idle projects.</strong> A Free project is paused after one week without activity. When it is paused, sign-in and the Agents page fail, but the public beach pages still work. Restore the project from the Supabase dashboard. Read <a href="https://supabase.com/docs/guides/platform/free-project-pausing" target="_blank" rel="noopener noreferrer">Supabase on pausing free projects</a>.</li>
+      <li><strong>Supabase email limit.</strong> The built-in email service sends 2 emails an hour, which covers sign-up confirmations and password resets for a small group. For more, configure custom SMTP. See <a href="https://supabase.com/docs/guides/auth/rate-limits" target="_blank" rel="noopener noreferrer">Supabase Auth rate limits</a>.</li>
+      <li><strong>Netlify credits.</strong> Each approved change triggers one build, and builds use Free plan credits. Keep builds rare. The <a href="https://docs.netlify.com/manage/security/secure-access-to-sites/rate-limiting/" target="_blank" rel="noopener noreferrer">Netlify rate limiting guide</a> explains how request limits apply.</li>
     </ul>
 
     <h2>Next steps</h2>
     <ul>
       <li>Read <a href="/how-it-works/">How it works</a> to understand the score and its limits.</li>
       <li>Read <a href="/resources/">Resources</a> for every official source.</li>
+      <li>Read the project <a href="https://github.com/atilus2020-design/BeachDay-kakashi/blob/main/README.md" target="_blank" rel="noopener noreferrer">README</a> for the full reference.</li>
     </ul>
   </main>
 
@@ -175,8 +225,8 @@ where email = 'you@example.com';</code></pre>
     <nav class="site-footer-links" aria-label="Footer">
       <a href="/resources/">Resources</a>
       <a href="/guide/">Guide</a>
-      <a href="https://github.com/atilus2020-design/BeachDay-kakashi" rel="noopener">GitHub repo</a>
-      <a href="https://mcp-api.netlify.app/" rel="noopener">API directory</a>
+      <a href="https://github.com/atilus2020-design/BeachDay-kakashi" target="_blank" rel="noopener noreferrer">GitHub repo</a>
+      <a href="https://mcp-api.netlify.app/" target="_blank" rel="noopener noreferrer">API directory</a>
     </nav>
     <p>Weather data by Open-Meteo.com. A planning aid, not a safety service.</p>
   </noscript>

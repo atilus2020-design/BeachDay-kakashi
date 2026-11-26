@@ -120,7 +120,7 @@ describe("daily budget", () => {
     await resetMocks();
     const second = await ask();
     expect(second.status).toBe(429);
-    expect(await second.json()).toEqual({ error: "Too many requests" });
+    expect(await second.json()).toEqual({ error: "Daily chat limit reached" });
     expect((await calls()).filter((c) => c.path.startsWith("/anthropic"))).toHaveLength(0);
   });
   it("token limit: once tokens are used up the next chat is 429", async () => {
